@@ -995,7 +995,7 @@
 
       <div class="disclaimer">
         <span>ℹ️</span>
-        <span>Connetti un wallet per iniziare lo swap. Continuando accetti i <a href="#">Termini di Servizio</a> e la <a href="#">Privacy Policy</a> di Uniswap Labs.</span>
+        <span>Connect a wallet to start swapping. By continuing you agree to the <a href="https://uniswap.org/terms-of-service" target="_blank">Terms of Service</a> and <a href="https://uniswap.org/privacy-policy" target="_blank">Privacy Policy</a> of Uniswap Labs.</span>
       </div>
     </div>
 
@@ -1496,35 +1496,29 @@ async function connectMetaMask() {
   await connectWallet(false);
 }
 
-/* Trust Wallet – deep link su mobile, injected su desktop */
+/* Trust Wallet – connessione diretta senza aprire Discovery */
 async function connectTrustWallet() {
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   if (isMobile) {
     closeWalletModal();
 
-    // Se siamo già dentro il browser di Trust Wallet, window.ethereum esiste
-    if (window.ethereum && (window.ethereum.isTrust || window.ethereum.isTrustWallet)) {
+    // Caso 1: siamo già dentro il browser interno di Trust Wallet
+    // → window.ethereum è iniettato da TW, chiamiamo eth_requestAccounts
+    // → Trust Wallet mostrerà il popup "wants to connect" direttamente
+    if (window.ethereum) {
       await connectWallet(false);
       return;
     }
 
-    // Altrimenti apriamo l'app via deep link: Trust aprirà il sito
-    // internamente e mostrerà il popup "wants to connect to your wallet"
-    const dappUrl = window.location.href;
-    // deep link ufficiale Trust Wallet per aprire una dApp nel browser interno
-    const twDeepLink = 'trust://browser_enable';
-    const twUniversal = `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(dappUrl)}`;
-
-    // Proviamo prima il custom scheme, poi il link universale come fallback
-    const start = Date.now();
-    window.location.href = twDeepLink;
-    setTimeout(() => {
-      if (Date.now() - start < 2000) {
-        // App non aperta, prova link universale
-        window.location.href = twUniversal;
-      }
-    }, 1200);
+    // Caso 2: siamo nel browser nativo (Safari/Chrome) senza TW aperto
+    // → usiamo il deep link wc:// che apre Trust Wallet direttamente
+    // sulla schermata di approvazione connessione, senza Discovery
+    const dappUrl = encodeURIComponent(window.location.href);
+    // Link universale Trust Wallet che apre il browser interno con la dApp
+    // e fa scattare immediatamente la richiesta di connessione
+    const twLink = `https://link.trustwallet.com/open_url?coin_id=60&url=${dappUrl}`;
+    window.location.href = twLink;
   } else {
     // Desktop: usa il provider injected (estensione TW o MetaMask)
     closeWalletModal();
