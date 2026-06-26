@@ -6,8 +6,8 @@
   <title>UniSwap Clone – DApp</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-  <!-- WalletConnect / Web3Modal v3 -->
-  <script src="https://cdn.jsdelivr.net/npm/@web3modal/standalone@2.4.3/dist/index.umd.js"></script>
+  <!-- WalletConnect v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/sign-client@2.17.0/dist/index.umd.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1490,60 +1490,201 @@ function closeWalletModal() {
   document.getElementById('walletModal').classList.remove('open');
 }
 
-/* MetaMask / injected provider */
+/* MetaMask – injected on desktop, WC deep link on mobile */
 async function connectMetaMask() {
-  closeWalletModal();
-  await connectWallet(false);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobile && !window.ethereum) {
+    await connectViaWalletConnect('metamask');
+  } else {
+    closeWalletModal();
+    await connectWallet(false);
+  }
 }
 
-/* Trust Wallet – connessione diretta senza aprire Discovery */
-async function connectTrustWallet() {
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+/* ══════════════════════════════════════════
+   WALLETCONNECT v2
+══════════════════════════════════════════ */
+const WC_PROJECT_ID = 'd07d37c02253065625623ec65b5d7948';
+let wcClient   = null;
+let wcSession  = null;
 
-  if (isMobile) {
-    closeWalletModal();
+async function initWCClient() {
+  if (wcClient) return wcClient;
+  // @walletconnect/sign-client exposes itself as SignClient on window
+  const SC = window.SignClient || (window.WalletConnectSignClient && window.WalletConnectSignClient.SignClient);
+  if (!SC) { console.error('WC SignClient not loaded'); return null; }
+  wcClient = await SC.init({
+    projectId: WC_PROJECT_ID,
+    metadata: {
+      name:        'Uniswap Interface',
+      description: 'The Uniswap Protocol Interface',
+      url:         window.location.origin,
+      icons:       ['https://app.uniswap.org/favicon.png']
+    }
+  });
+  // Handle session events
+  wcClient.on('session_event',   () => {});
+  wcClient.on('session_update',  ({ topic, params }) => { wcSession = { ...wcSession, ...params }; });
+  wcClient.on('session_delete',  () => { wcSession = null; disconnectWC(); });
+  return wcClient;
+}
 
-    // Caso 1: siamo già dentro il browser interno di Trust Wallet
-    // → window.ethereum è iniettato da TW, chiamiamo eth_requestAccounts
-    // → Trust Wallet mostrerà il popup "wants to connect" direttamente
-    if (window.ethereum) {
-      await connectWallet(false);
-      return;
+async function connectViaWalletConnect(walletName) {
+  closeWalletModal();
+  try {
+    const client = await initWCClient();
+    if (!client) { alert('WalletConnect SDK not ready, please refresh.'); return; }
+
+    const { uri, approval } = await client.connect({
+      requiredNamespaces: {
+        eip155: {
+          methods:  ['eth_sendTransaction','eth_signTransaction','eth_sign','personal_sign','eth_signTypedData'],
+          chains:   ['eip155:56'], // BSC
+          events:   ['chainChanged','accountsChanged']
+        }
+      }
+    });
+
+    if (!uri) return;
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // Build wallet-specific deep link that opens the APPROVAL screen directly
+      let deepLink = '';
+      if (walletName === 'trust') {
+        // Trust Wallet: wc: URI encoded into their deep link
+        deepLink = `trust://wc?uri=${encodeURIComponent(uri)}`;
+      } else if (walletName === 'metamask') {
+        deepLink = `metamask://wc?uri=${encodeURIComponent(uri)}`;
+      } else if (walletName === 'coinbase') {
+        deepLink = `cbwallet://wc?uri=${encodeURIComponent(uri)}`;
+      } else {
+        // Generic WalletConnect — just encode the wc: URI
+        deepLink = uri;
+      }
+
+      // Open Trust Wallet (or other wallet) directly on connection approval screen
+      window.location.href = deepLink;
+
+      // Fallback universal link for Trust Wallet after 1.5s if app didn't open
+      if (walletName === 'trust') {
+        setTimeout(() => {
+          window.location.href = `https://link.trustwallet.com/wc?uri=${encodeURIComponent(uri)}`;
+        }, 1500);
+      }
+    } else {
+      // Desktop: show QR modal
+      showQRModal(uri);
     }
 
-    // Caso 2: siamo nel browser nativo (Safari/Chrome) senza TW aperto
-    // → usiamo il deep link wc:// che apre Trust Wallet direttamente
-    // sulla schermata di approvazione connessione, senza Discovery
-    const dappUrl = encodeURIComponent(window.location.href);
-    // Link universale Trust Wallet che apre il browser interno con la dApp
-    // e fa scattare immediatamente la richiesta di connessione
-    const twLink = `https://link.trustwallet.com/open_url?coin_id=60&url=${dappUrl}`;
-    window.location.href = twLink;
-  } else {
-    // Desktop: usa il provider injected (estensione TW o MetaMask)
+    // Wait for wallet to approve
+    wcSession = await approval();
+    closeQRModal();
+
+    const accounts = wcSession.namespaces.eip155.accounts;
+    if (!accounts || !accounts.length) return;
+    const address = accounts[0].split(':')[2]; // "eip155:56:0x..."
+
+    connected   = true;
+    userAddress = address;
+    const shortAddr = address.slice(0,6) + '...' + address.slice(-4);
+    document.getElementById('navConnectBtn').textContent = shortAddr;
+    updateButton();
+
+    // Use WC as provider for balance fetching
+    await fetchBalancesWC(address);
+
+  } catch(err) {
+    closeQRModal();
+    console.error('WalletConnect error:', err);
+  }
+}
+
+async function fetchBalancesWC(address) {
+  // If window.ethereum available use it; otherwise skip (WC provider is complex for reads)
+  if (window.ethereum) {
+    fetchBalances(address);
+  }
+  // Show address at minimum
+  updateBalanceDisplay();
+}
+
+function disconnectWC() {
+  connected   = false;
+  userAddress = null;
+  balances    = {};
+  document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
+  updateButton();
+}
+
+/* ── QR Modal ── */
+function showQRModal(uri) {
+  let overlay = document.getElementById('qrOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'qrOverlay';
+    overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;
+      display:flex;align-items:center;justify-content:center`;
+    overlay.innerHTML = `
+      <div style="background:#1A1B26;border:1px solid #2C2D3A;border-radius:24px;padding:28px;
+        max-width:340px;width:90%;text-align:center">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+          <span style="font-weight:600;font-size:1rem">Scan with your wallet</span>
+          <button onclick="closeQRModal()" style="background:none;border:none;color:#7C7E9A;
+            font-size:22px;cursor:pointer">✕</button>
+        </div>
+        <canvas id="qrCanvas" style="border-radius:12px;width:240px;height:240px"></canvas>
+        <p style="color:#7C7E9A;font-size:0.8rem;margin-top:14px">
+          Open Trust Wallet, MetaMask or any WalletConnect-compatible wallet and scan this QR code
+        </p>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+  // Draw QR using a simple API
+  const img = document.createElement('img');
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(uri)}&bgcolor=1A1B26&color=FFFFFF&qzone=1`;
+  img.style.cssText = 'width:240px;height:240px;border-radius:12px';
+  img.onload = () => {
+    const canvas = document.getElementById('qrCanvas');
+    if (canvas) canvas.replaceWith(img);
+  };
+}
+function closeQRModal() {
+  const ov = document.getElementById('qrOverlay');
+  if (ov) ov.style.display = 'none';
+}
+
+/* Trust Wallet via WalletConnect v2 – NO internal browser */
+async function connectTrustWallet() {
+  // If already inside Trust Wallet's internal browser, use injected provider
+  if (window.ethereum && (window.ethereum.isTrust || window.ethereum.isTrustWallet)) {
     closeWalletModal();
     await connectWallet(false);
+    return;
   }
+  // Otherwise use WalletConnect: opens TW on the CONNECT approval screen
+  await connectViaWalletConnect('trust');
 }
 
-/* WalletConnect (simple QR via URI scheme fallback) */
+/* Generic WalletConnect */
 async function connectWalletConnect() {
-  closeWalletModal();
-  // If WalletConnect v2 SDK loaded, use it; otherwise fall back to MetaMask
-  if (window.ethereum) {
-    await connectWallet(false);
-  } else {
-    alert('Per usare WalletConnect apri questa pagina nel browser in-app del tuo wallet.');
-  }
+  await connectViaWalletConnect('wc');
 }
 
-/* Coinbase Wallet */
+/* Coinbase Wallet – injected on desktop, WC deep link on mobile */
 async function connectCoinbase() {
-  closeWalletModal();
-  if (window.ethereum) {
-    await connectWallet(false);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobile && !window.ethereum) {
+    await connectViaWalletConnect('coinbase');
   } else {
-    window.open('https://go.cb-w.com/dapp?cb_url=' + encodeURIComponent(window.location.href), '_blank');
+    closeWalletModal();
+    if (window.ethereum) {
+      await connectWallet(false);
+    } else {
+      window.open('https://go.cb-w.com/dapp?cb_url=' + encodeURIComponent(window.location.href), '_blank');
+    }
   }
 }
 
