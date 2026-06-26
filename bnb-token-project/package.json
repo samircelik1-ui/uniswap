@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",
+    "@walletconnect/ethereum-provider": "^2.23.10",
     "dotenv": "^17.4.2"
   }
 }
