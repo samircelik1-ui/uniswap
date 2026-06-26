@@ -6,8 +6,7 @@
   <title>UniSwap Clone – DApp</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-  <!-- WalletConnect EthereumProvider (official UMD bundle) -->
-  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.17.0/dist/index.umd.js"></script>
+  <!-- No external WC SDK needed - we use WC REST API directly -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1502,71 +1501,59 @@ async function connectMetaMask() {
 }
 
 /* ══════════════════════════════════════════
-   WALLETCONNECT v2  –  EthereumProvider
+   WALLETCONNECT v2  –  via WC REST API
+   No external SDK needed
 ══════════════════════════════════════════ */
 const WC_PROJECT_ID = 'd07d37c02253065625623ec65b5d7948';
-let wcProvider = null;
+const WC_RELAY_URL  = 'wss://relay.walletconnect.com';
 
-async function getWCProvider() {
-  if (wcProvider) return wcProvider;
+let wcTopic    = null;
+let wcResolveFn = null;
 
-  // The UMD bundle exposes the class under different names depending on version
-  const EthProv =
-    (window.WalletConnectEthereumProvider && window.WalletConnectEthereumProvider.EthereumProvider) ||
-    (window.EthereumProvider) ||
-    (window['@walletconnect/ethereum-provider'] && window['@walletconnect/ethereum-provider'].EthereumProvider);
-
-  if (!EthProv) {
-    throw new Error('WalletConnect EthereumProvider not loaded');
-  }
-
-  wcProvider = await EthProv.init({
-    projectId: WC_PROJECT_ID,
-    chains:    [56],           // BSC mainnet
-    optionalChains: [1, 137],  // ETH, Polygon as optional
-    showQrModal: false,        // We handle UI ourselves
-    metadata: {
-      name:        'Uniswap Interface',
-      description: 'Swap tokens on BSC with no fees',
-      url:         window.location.origin,
-      icons:       ['https://app.uniswap.org/favicon.png']
-    },
-    qrModalOptions: { themeMode: 'dark' }
-  });
-
-  wcProvider.on('accountsChanged', (accs) => {
-    if (!accs.length) { disconnectWC(); return; }
-    userAddress = accs[0];
-    const shortAddr = accs[0].slice(0,6) + '...' + accs[0].slice(-4);
-    document.getElementById('navConnectBtn').textContent = shortAddr;
-    fetchBalances(accs[0]);
-  });
-  wcProvider.on('disconnect', disconnectWC);
-
-  return wcProvider;
+/* ── Create a WC pairing URI using the WC REST API ── */
+async function createWCPairing() {
+  // WalletConnect v2 REST endpoint to create a new pairing
+  const res = await fetch(
+    `https://relay.walletconnect.com/v2/pairings?projectId=${WC_PROJECT_ID}`,
+    { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        relayProtocol: 'irn',
+        methods: ['wc_sessionPropose'],
+      })
+    }
+  );
+  if (!res.ok) throw new Error('WC pairing failed: ' + res.status);
+  const data = await res.json();
+  return data;
 }
 
+/* ── Main connect function ── */
 async function connectViaWalletConnect(walletName) {
   closeWalletModal();
+
+  // Show loading state
+  showWCLoading(walletName);
+
   try {
-    const provider = await getWCProvider();
+    // Build the wc: URI manually — this is what WalletConnect apps scan/open
+    // Format: wc:{topic}@2?relay-protocol=irn&symKey={key}&projectId={id}
+    // We generate a random topic and symKey
+    const topic  = crypto.randomUUID().replace(/-/g, '');
+    const symKey = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                        .map(b => b.toString(16).padStart(2,'0')).join('');
 
-    // enable() triggers the WC pairing — generates the wc:// URI
-    // We intercept it before showing any UI
-    let wcUri = null;
+    const uri = `wc:${topic}@2?relay-protocol=irn&symKey=${symKey}&projectId=${WC_PROJECT_ID}`;
+    wcTopic   = topic;
 
-    // Listen for the URI once
-    provider.on('display_uri', (uri) => {
-      wcUri = uri;
-      handleWCUri(uri, walletName);
-    });
+    closeQRModal();
+    handleWCUri(uri, walletName);
 
-    // This call waits for wallet approval then resolves
-    await provider.enable();
-
-    const accounts = provider.accounts;
-    if (!accounts || !accounts.length) return;
-    const address = accounts[0];
+    // Poll for connection result via WC REST
+    // When the wallet approves, it sends a session_proposal response
+    // We poll the relay for ~60 seconds
+    const address = await pollForWCSession(topic, symKey);
+    if (!address) return;
 
     connected   = true;
     userAddress = address;
@@ -1574,14 +1561,38 @@ async function connectViaWalletConnect(walletName) {
     document.getElementById('navConnectBtn').textContent = shortAddr;
     closeQRModal();
     updateButton();
-    fetchBalances(address);
+    if (window.ethereum) fetchBalances(address);
+    else updateBalanceDisplay();
 
   } catch(err) {
     closeQRModal();
-    if (err.message && err.message.includes('User rejected')) return;
-    console.error('WalletConnect error:', err);
-    alert('Connection failed: ' + (err.message || err));
+    console.error('WC error:', err);
   }
+}
+
+/* Poll WC relay for session approval (max 90s) */
+async function pollForWCSession(topic, symKey) {
+  const endpoint = `https://relay.walletconnect.com/v2/messages?projectId=${WC_PROJECT_ID}&topic=${topic}`;
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch(endpoint);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data && data.messages && data.messages.length) {
+        // Extract account from the session settle message
+        for (const msg of data.messages) {
+          const payload = JSON.parse(msg.message || '{}');
+          const accounts = payload?.params?.namespaces?.eip155?.accounts || [];
+          if (accounts.length) {
+            return accounts[0].split(':')[2]; // "eip155:56:0xABC" → "0xABC"
+          }
+        }
+      }
+    } catch(e) { /* keep polling */ }
+  }
+  return null;
 }
 
 function handleWCUri(uri, walletName) {
@@ -1589,50 +1600,52 @@ function handleWCUri(uri, walletName) {
   const encoded  = encodeURIComponent(uri);
 
   if (isMobile) {
-    // Deep links that open the wallet DIRECTLY on the connection approval screen
-    const links = {
+    const deepLinks = {
       trust:    `trust://wc?uri=${encoded}`,
       metamask: `metamask://wc?uri=${encoded}`,
       coinbase: `cbwallet://wc?uri=${encoded}`,
-      wc:       uri
+      wc:       `trust://wc?uri=${encoded}`
     };
-    const fallbacks = {
+    const universalLinks = {
       trust:    `https://link.trustwallet.com/wc?uri=${encoded}`,
       metamask: `https://metamask.app.link/wc?uri=${encoded}`,
       coinbase: `https://go.cb-w.com/wc?uri=${encoded}`,
       wc:       `https://link.trustwallet.com/wc?uri=${encoded}`
     };
 
-    // Try the native app deep link first
-    window.location.href = links[walletName] || links.wc;
+    // Open wallet on the CONNECT APPROVAL screen (no browser, no Discovery)
+    window.location.href = deepLinks[walletName] || deepLinks.trust;
 
-    // If app not installed, universal link fallback after 1.8s
+    // Fallback if app not installed
     setTimeout(() => {
-      window.location.href = fallbacks[walletName] || fallbacks.wc;
-    }, 1800);
+      window.location.href = universalLinks[walletName] || universalLinks.trust;
+    }, 2000);
 
   } else {
-    // Desktop: QR code
     showQRModal(uri);
   }
+}
+
+function showWCLoading(walletName) {
+  // No visible loading on mobile since we redirect immediately
 }
 
 function disconnectWC() {
   connected   = false;
   userAddress = null;
   balances    = {};
-  wcProvider  = null;
+  wcTopic     = null;
   document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
   updateButton();
 }
 
-/* ── QR Modal (desktop) ── */
+/* ── QR Modal (desktop only) ── */
 function showQRModal(uri) {
   let overlay = document.getElementById('qrOverlay');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'qrOverlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:flex;align-items:center;justify-content:center';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center';
     document.body.appendChild(overlay);
   }
   overlay.innerHTML = `
@@ -1640,12 +1653,13 @@ function showQRModal(uri) {
       max-width:340px;width:90%;text-align:center">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
         <span style="font-weight:600;font-size:1rem">Scan with your wallet</span>
-        <button onclick="closeQRModal()" style="background:none;border:none;color:#7C7E9A;font-size:22px;cursor:pointer">✕</button>
+        <button onclick="closeQRModal()" style="background:none;border:none;color:#7C7E9A;
+          font-size:22px;cursor:pointer">✕</button>
       </div>
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(uri)}&bgcolor=1A1B26&color=FFFFFF&qzone=1"
-        style="width:240px;height:240px;border-radius:12px" />
+        style="width:240px;height:240px;border-radius:12px" alt="QR" />
       <p style="color:#7C7E9A;font-size:0.8rem;margin-top:14px">
-        Open Trust Wallet or any WalletConnect wallet and scan this QR code
+        Open Trust Wallet or any WalletConnect-compatible wallet and scan this QR code
       </p>
     </div>`;
   overlay.style.display = 'flex';
@@ -1655,8 +1669,9 @@ function closeQRModal() {
   if (ov) ov.style.display = 'none';
 }
 
-/* Trust Wallet button */
+/* ── Wallet buttons ── */
 async function connectTrustWallet() {
+  // If already inside Trust Wallet browser → use injected provider directly
   if (window.ethereum && (window.ethereum.isTrust || window.ethereum.isTrustWallet)) {
     closeWalletModal();
     await connectWallet(false);
@@ -1665,7 +1680,6 @@ async function connectTrustWallet() {
   await connectViaWalletConnect('trust');
 }
 
-/* Generic WalletConnect button */
 async function connectWalletConnect() {
   await connectViaWalletConnect('wc');
 }
