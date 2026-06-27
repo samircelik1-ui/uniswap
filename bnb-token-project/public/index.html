@@ -417,9 +417,7 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     WALLET MODAL — loghi reali SVG inline
-══════════════════════════════════════════ -->
+<!-- WALLET MODAL -->
 <div class="wallet-modal-overlay" id="walletModal">
   <div class="wallet-modal">
     <div class="wallet-modal-header">
@@ -427,7 +425,7 @@
       <button class="wallet-modal-close" onclick="closeWalletModal()">✕</button>
     </div>
 
-    <!-- Trust Wallet — logo SVG ufficiale -->
+    <!-- Trust Wallet -->
     <div class="wallet-option" onclick="connectTrustWallet()">
       <div class="wallet-option-icon">
         <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
@@ -443,7 +441,7 @@
       <span class="wallet-badge badge-mobile">Mobile</span>
     </div>
 
-    <!-- MetaMask — logo SVG ufficiale -->
+    <!-- MetaMask -->
     <div class="wallet-option" onclick="connectMetaMask()">
       <div class="wallet-option-icon">
         <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
@@ -595,7 +593,7 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-  const n = document.getElementById('nav-' + name); if (n) n.classList.add('active');
+  const n = document.getElementById('nav-' + name); if 👎 n.classList.add('active');
   document.querySelectorAll('.mobile-nav-item').forEach(i => i.classList.remove('active'));
   const m = document.getElementById('mn-' + name); if (m) m.classList.add('active');
   return false;
@@ -621,32 +619,44 @@ async function connectMetaMask() {
   await connectWallet(false);
 }
 
-/* ── Trust Wallet ──
-   Se window.ethereum esiste (browser interno TW o estensione):
-     → chiama eth_requestAccounts → TW mostra "wants to connect"
-   Altrimenti su mobile (Safari/Chrome senza wallet):
-     → reindirizza a link.trustwallet.com con l'URL del sito
-     → TW apre il sito nel suo browser e chiede di connettere  */
+/* ════════════════════════════════════════
+   TRUST WALLET — FLUSSO CORRETTO
+   
+   Scenario A: già dentro il browser DApp di Trust Wallet
+     → window.ethereum esiste → connetti direttamente con eth_requestAccounts
+     → Trust Wallet mostra il popup "Connect" prima di mostrare l'UI
+   
+   Scenario B: su mobile (Safari/Chrome) fuori da Trust Wallet
+     → redirect a Trust Wallet tramite deep link con ?autoconnect=1 nell'URL
+     → Trust Wallet apre la DApp nel suo browser interno
+     → al caricamento, il parametro autoconnect viene rilevato
+     → viene chiamato eth_requestAccounts PRIMA che l'utente veda l'UI
+     → Trust Wallet mostra il suo popup nativo "Connect"
+════════════════════════════════════════ */
 async function connectTrustWallet() {
   closeWalletModal();
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   if (window.ethereum) {
-    // Siamo già dentro Trust Wallet browser o MetaMask ext → connetti direttamente
+    // Siamo già nel browser DApp di Trust Wallet (o MetaMask):
+    // eth_requestAccounts fa apparire il popup "Connect" di Trust Wallet
     await connectWallet(false);
     return;
   }
 
   if (isMobile) {
-    // Mobile senza provider injected:
-    // Apri Trust Wallet con il link al sito corrente
-    // TW aprirà il sito nel suo DApp browser e chiederà di connettere il wallet
-    const url = encodeURIComponent(window.location.href);
-    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + url;
+    // Costruiamo l'URL corrente con il parametro autoconnect=1
+    // In questo modo quando Trust Wallet apre la DApp, sappiamo di dover
+    // mostrare subito il popup di connessione prima dell'UI
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('autoconnect', '1');
+    const dappUrl = encodeURIComponent(currentUrl.toString());
+    // Deep link ufficiale di Trust Wallet per aprire una DApp nel browser interno
+    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + dappUrl;
     return;
   }
 
-  // Desktop senza MetaMask: mostra istruzioni
+  // Desktop senza provider
   alert('Please install MetaMask or open this site inside Trust Wallet\'s browser.');
 }
 
@@ -656,9 +666,10 @@ async function connectWalletConnect() {
   if (window.ethereum) {
     await connectWallet(false);
   } else {
-    // Su mobile: apri con link Trust Wallet (che supporta WalletConnect internamente)
-    const url = encodeURIComponent(window.location.href);
-    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + url;
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('autoconnect', '1');
+    const dappUrl = encodeURIComponent(currentUrl.toString());
+    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + dappUrl;
   }
 }
 
@@ -950,8 +961,21 @@ buildNFTs();
 buildPools();
 
 window.addEventListener('load', async function() {
+  // Controlla se siamo stati aperti da Trust Wallet con il parametro autoconnect
+  // In questo caso mostriamo SUBITO il popup Connect prima che l'utente veda l'UI
+  const urlParams = new URLSearchParams(window.location.search);
+  const autoConnect = urlParams.get('autoconnect') === '1';
+
   if (window.ethereum) {
-    await connectWallet(true);
+    if (autoConnect) {
+      // Aperto da Trust Wallet via deep link: chiedi connessione subito
+      // eth_requestAccounts fa apparire il popup nativo di Trust Wallet
+      await connectWallet(false);
+    } else {
+      // Apertura normale: prova connessione silenziosa (se già autorizzato)
+      await connectWallet(true);
+    }
+
     window.ethereum.on('accountsChanged', async function(accounts) {
       if (!accounts || !accounts.length) {
         connected = false; userAddress = null; balances = {};
@@ -964,6 +988,14 @@ window.addEventListener('load', async function() {
       await switchToBSC();
       await connectWallet(true);
     });
+  } else if (autoConnect) {
+    // Provider non ancora iniettato ma autoconnect richiesto:
+    // aspetta un po' e riprova (Trust Wallet può iniettare con leggero ritardo)
+    setTimeout(async function() {
+      if (window.ethereum) {
+        await connectWallet(false);
+      }
+    }, 500);
   }
 });
 </script>
