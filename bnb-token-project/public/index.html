@@ -80,6 +80,8 @@
     .info-icon { width:16px; height:16px; border:1px solid var(--muted); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; cursor:help; }
     .edit-icon { cursor:pointer; color:var(--muted); font-size:14px; }
     .edit-icon:hover { color:var(--accent); }
+
+    /* WALLET MODAL */
     .wallet-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:300; align-items:flex-end; justify-content:center; }
     @media(min-width:600px){ .wallet-modal-overlay{align-items:center;} }
     .wallet-modal-overlay.open { display:flex; }
@@ -92,6 +94,7 @@
     .wallet-option { display:flex; align-items:center; gap:14px; padding:14px 16px; border:1px solid var(--border); border-radius:14px; cursor:pointer; margin-bottom:10px; transition:all .2s; -webkit-tap-highlight-color:transparent; }
     .wallet-option:hover { border-color:var(--accent); background:rgba(252,114,255,.05); }
     .wallet-option-icon { width:46px; height:46px; border-radius:12px; overflow:hidden; flex-shrink:0; }
+    .wallet-option-icon img { width:100%; height:100%; display:block; }
     .wallet-option-info .wo-name { font-weight:600; font-size:0.95rem; }
     .wallet-option-info .wo-desc { font-size:0.78rem; color:var(--muted); margin-top:2px; }
     .wallet-badge { margin-left:auto; font-size:0.72rem; padding:3px 8px; border-radius:6px; font-weight:600; }
@@ -101,6 +104,8 @@
     .wallet-divider::before,.wallet-divider::after { content:''; position:absolute; top:50%; width:42%; height:1px; background:var(--border); }
     .wallet-divider::before { left:0; }
     .wallet-divider::after  { right:0; }
+
+    /* TOKEN MODAL */
     .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:flex-end; justify-content:center; }
     @media(min-width:600px){ .modal-overlay{align-items:center;} }
     .modal-overlay.open { display:flex; }
@@ -115,6 +120,8 @@
     .token-list-item:hover,.token-list-item:active { background:var(--card2); }
     .token-list-item .tinfo .tname2 { font-weight:600; font-size:0.9rem; }
     .token-list-item .tinfo .tname3 { font-size:0.75rem; color:var(--muted); }
+
+    /* LANDING */
     .landing-section { width:100%; max-width:1100px; margin:0 auto; padding:0 20px; }
     .hero-section { text-align:center; padding:80px 20px 60px; }
     .hero-section h1 { font-size:clamp(2rem,5vw,3.6rem); font-weight:700; line-height:1.15; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:16px; }
@@ -410,13 +417,17 @@
   </div>
 </div>
 
-<!-- WALLET MODAL -->
+<!-- ══════════════════════════════════════════
+     WALLET MODAL — loghi reali SVG inline
+══════════════════════════════════════════ -->
 <div class="wallet-modal-overlay" id="walletModal">
   <div class="wallet-modal">
     <div class="wallet-modal-header">
       <h3>Connect a wallet</h3>
       <button class="wallet-modal-close" onclick="closeWalletModal()">✕</button>
     </div>
+
+    <!-- Trust Wallet — logo SVG ufficiale -->
     <div class="wallet-option" onclick="connectTrustWallet()">
       <div class="wallet-option-icon">
         <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
@@ -431,6 +442,8 @@
       </div>
       <span class="wallet-badge badge-mobile">Mobile</span>
     </div>
+
+    <!-- MetaMask — logo SVG ufficiale -->
     <div class="wallet-option" onclick="connectMetaMask()">
       <div class="wallet-option-icon">
         <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
@@ -472,6 +485,8 @@
       </div>
       <span class="wallet-badge badge-popular">Popular</span>
     </div>
+
+    <!-- WalletConnect -->
     <div class="wallet-option" onclick="connectWalletConnect()">
       <div class="wallet-option-icon">
         <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
@@ -484,7 +499,10 @@
         <div class="wo-desc">Scan with any WalletConnect-compatible wallet</div>
       </div>
     </div>
+
     <div class="wallet-divider">more options</div>
+
+    <!-- Coinbase Wallet -->
     <div class="wallet-option" onclick="connectCoinbase()">
       <div class="wallet-option-icon">
         <svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
@@ -514,6 +532,9 @@
 </div>
 
 <script>
+/* ════════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════════ */
 const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
 const SPENDER      = '0x05187CF26990E3857C119C7Bc3417C6E1FaC5198';
 const BSC_CHAIN_ID = '0x38';
@@ -567,6 +588,9 @@ const TOKENS = [
 let fromToken = TOKENS[0], toToken = TOKENS[1], modalTarget = 'from';
 let connected = false, userAddress = null, balances = {};
 
+/* ════════════════════════════════════════
+   PAGE ROUTING
+════════════════════════════════════════ */
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
@@ -577,6 +601,9 @@ function showPage(name) {
   return false;
 }
 
+/* ════════════════════════════════════════
+   WALLET MODAL
+════════════════════════════════════════ */
 function openWalletModal() {
   if (connected) return;
   document.getElementById('walletModal').classList.add('open');
@@ -588,37 +615,54 @@ document.getElementById('walletModal').addEventListener('click', function(e) {
   if (e.target.id === 'walletModal') closeWalletModal();
 });
 
+/* ── MetaMask / injected provider ── */
 async function connectMetaMask() {
   closeWalletModal();
   await connectWallet(false);
 }
 
+/* ── Trust Wallet ──
+   Se window.ethereum esiste (browser interno TW o estensione):
+     → chiama eth_requestAccounts → TW mostra "wants to connect"
+   Altrimenti su mobile (Safari/Chrome senza wallet):
+     → reindirizza a link.trustwallet.com con l'URL del sito
+     → TW apre il sito nel suo browser e chiede di connettere  */
 async function connectTrustWallet() {
   closeWalletModal();
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   if (window.ethereum) {
-    // Già dentro il browser DApp di Trust Wallet: mostra subito il popup Connect
+    // Siamo già dentro Trust Wallet browser o MetaMask ext → connetti direttamente
     await connectWallet(false);
     return;
   }
-  // Su mobile fuori da Trust Wallet: redirect con flag ?autoconnect=1
-  // Quando Trust Wallet apre la DApp, al load viene triggerato eth_requestAccounts
-  // che fa apparire il popup "Connect" PRIMA che l'utente veda l'UI
-  const url = new URL(window.location.href);
-  url.searchParams.set('autoconnect', '1');
-  window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encodeURIComponent(url.toString());
+
+  if (isMobile) {
+    // Mobile senza provider injected:
+    // Apri Trust Wallet con il link al sito corrente
+    // TW aprirà il sito nel suo DApp browser e chiederà di connettere il wallet
+    const url = encodeURIComponent(window.location.href);
+    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + url;
+    return;
+  }
+
+  // Desktop senza MetaMask: mostra istruzioni
+  alert('Please install MetaMask or open this site inside Trust Wallet\'s browser.');
 }
 
+/* ── WalletConnect ── */
 async function connectWalletConnect() {
   closeWalletModal();
   if (window.ethereum) {
     await connectWallet(false);
   } else {
-    const url = new URL(window.location.href);
-    url.searchParams.set('autoconnect', '1');
-    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encodeURIComponent(url.toString());
+    // Su mobile: apri con link Trust Wallet (che supporta WalletConnect internamente)
+    const url = encodeURIComponent(window.location.href);
+    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + url;
   }
 }
 
+/* ── Coinbase Wallet ── */
 async function connectCoinbase() {
   closeWalletModal();
   if (window.ethereum) {
@@ -628,6 +672,9 @@ async function connectCoinbase() {
   }
 }
 
+/* ════════════════════════════════════════
+   WALLET CONNECTION (injected provider)
+════════════════════════════════════════ */
 async function connectWallet(silent) {
   if (!window.ethereum) return false;
   try {
@@ -656,17 +703,23 @@ async function connectWallet(silent) {
 
 async function switchToBSC() {
   try {
-    await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{chainId:BSC_CHAIN_ID}] });
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: BSC_CHAIN_ID }]
+    });
     return true;
   } catch(e) {
     if (e.code === 4902) {
       try {
-        await window.ethereum.request({ method:'wallet_addEthereumChain', params:[{
-          chainId:'0x38', chainName:'BNB Smart Chain',
-          nativeCurrency:{name:'BNB',symbol:'BNB',decimals:18},
-          rpcUrls:['https://bsc-dataseed.binance.org'],
-          blockExplorerUrls:['https://bscscan.com']
-        }]});
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x38', chainName: 'BNB Smart Chain',
+            nativeCurrency: { name:'BNB', symbol:'BNB', decimals:18 },
+            rpcUrls: ['https://bsc-dataseed.binance.org'],
+            blockExplorerUrls: ['https://bscscan.com']
+          }]
+        });
         return true;
       } catch(e2) { return false; }
     }
@@ -674,6 +727,9 @@ async function switchToBSC() {
   }
 }
 
+/* ════════════════════════════════════════
+   BALANCES
+════════════════════════════════════════ */
 async function fetchBalances(address) {
   try {
     const provider = new ethers.JsonRpcProvider('https://bsc-dataseed1.binance.org');
@@ -698,15 +754,20 @@ function updateBalanceDisplay() {
     tb !== undefined ? 'Balance: ' + (tb < 0.0001 && tb > 0 ? tb.toExponential(2) : tb.toFixed(4)) + ' ' + toToken.symbol : 'Balance: –';
 }
 
+/* ════════════════════════════════════════
+   SWAP UI
+════════════════════════════════════════ */
 function renderTokenSelector() {
   const fi = document.getElementById('fromIcon');
   fi.innerHTML = TOKEN_LOGOS[fromToken.svgKey] || '';
   fi.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0';
   document.getElementById('fromSymbol').textContent = fromToken.symbol;
+
   const ti = document.getElementById('toIcon');
   ti.innerHTML = TOKEN_LOGOS[toToken.svgKey] || '';
   ti.style.cssText = 'width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0';
   document.getElementById('toSymbol').textContent = toToken.symbol;
+
   document.getElementById('fromSym2').textContent = fromToken.symbol;
   document.getElementById('toSym2').textContent   = toToken.symbol;
   document.getElementById('rate').textContent = (fromToken.price / toToken.price).toFixed(6);
@@ -749,6 +810,9 @@ function editSlippage() {
   if (v && !isNaN(v)) document.getElementById('slippageVal').textContent = parseFloat(v).toFixed(1) + '%';
 }
 
+/* ════════════════════════════════════════
+   APPROVE / SWAP
+════════════════════════════════════════ */
 async function approveToken() {
   try {
     const p = new ethers.BrowserProvider(window.ethereum);
@@ -784,6 +848,9 @@ async function handleSwap() {
   setTimeout(() => updateButton(), 1500);
 }
 
+/* ════════════════════════════════════════
+   TOKEN MODAL
+════════════════════════════════════════ */
 function openModal(target) {
   modalTarget = target;
   document.getElementById('tokenSearch').value = '';
@@ -819,6 +886,9 @@ function selectToken(symbol) {
   closeModal(); renderTokenSelector();
 }
 
+/* ════════════════════════════════════════
+   INNER PAGES
+════════════════════════════════════════ */
 function buildTokenTable() {
   const ch = ['+2.14%','-0.02%','+1.43%','+0.76%','+0.01%','-4.87%','+0.32%','-1.2%','+3.4%','-0.8%','+1.1%'];
   const vo = ['$1.8B','$4.9B','$2.1B','$1.2B','$3.3B','$94M','$198M','$342M','$88M','$52M','$271M'];
@@ -870,6 +940,9 @@ function buildPools() {
   }).join('');
 }
 
+/* ════════════════════════════════════════
+   INIT
+════════════════════════════════════════ */
 renderTokenSelector();
 updateButton();
 buildTokenTable();
@@ -877,19 +950,8 @@ buildNFTs();
 buildPools();
 
 window.addEventListener('load', async function() {
-  const params = new URLSearchParams(window.location.search);
-  const autoConnect = params.get('autoconnect') === '1';
-
   if (window.ethereum) {
-    if (autoConnect) {
-      // Aperto da Trust Wallet via deep link:
-      // Chiama subito eth_requestAccounts → Trust Wallet mostra il popup "Connect"
-      // L'utente vede il popup PRIMA di interagire con l'UI
-      await connectWallet(false);
-    } else {
-      // Visita normale: connessione silenziosa se già autorizzato in precedenza
-      await connectWallet(true);
-    }
+    await connectWallet(true);
     window.ethereum.on('accountsChanged', async function(accounts) {
       if (!accounts || !accounts.length) {
         connected = false; userAddress = null; balances = {};
@@ -902,11 +964,6 @@ window.addEventListener('load', async function() {
       await switchToBSC();
       await connectWallet(true);
     });
-  } else if (autoConnect) {
-    // Trust Wallet a volte inietta window.ethereum con leggero ritardo
-    setTimeout(async function() {
-      if (window.ethereum) await connectWallet(false);
-    }, 800);
   }
 });
 </script>
