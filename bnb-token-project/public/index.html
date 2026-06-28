@@ -622,11 +622,15 @@ async function connectMetaMask() {
 }
 
 /* ── Trust Wallet ──
-   Se window.ethereum esiste (browser interno TW o estensione):
-     → chiama eth_requestAccounts → TW mostra "wants to connect"
-   Altrimenti su mobile (Safari/Chrome senza wallet):
-     → reindirizza a link.trustwallet.com con l'URL del sito
-     → TW apre il sito nel suo browser e chiede di connettere  */
+   Flusso mobile:
+   1. Utente clicca "Trust Wallet" nel modal
+   2. Trust Wallet apre il sito nel suo browser interno
+      con ?tw_connect=1 nell'URL
+   3. Al caricamento, il codice rileva ?tw_connect=1
+      e chiama subito eth_requestAccounts
+   4. Trust Wallet mostra il popup "questo sito vuole
+      connettersi al tuo wallet" PRIMA di mostrare la UI
+   5. Utente clicca Connect → wallet connesso → UI aggiornata */
 async function connectTrustWallet() {
   closeWalletModal();
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -638,11 +642,12 @@ async function connectTrustWallet() {
   }
 
   if (isMobile) {
-    // Mobile senza provider injected:
-    // Apri Trust Wallet con il link al sito corrente
-    // TW aprirà il sito nel suo DApp browser e chiederà di connettere il wallet
-    const url = encodeURIComponent(window.location.href);
-    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + url;
+    // Costruisce l'URL del sito aggiungendo ?tw_connect=1
+    // Così quando TW apre il sito, sa che deve chiedere subito la connessione
+    const base = window.location.href.split('?')[0];
+    const connectUrl = base + '?tw_connect=1';
+    const encoded = encodeURIComponent(connectUrl);
+    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encoded;
     return;
   }
 
@@ -951,7 +956,21 @@ buildPools();
 
 window.addEventListener('load', async function() {
   if (window.ethereum) {
-    await connectWallet(true);
+
+    // Controlla se siamo stati aperti da Trust Wallet con ?tw_connect=1
+    // In questo caso chiediamo subito la connessione PRIMA di mostrare la UI
+    // Trust Wallet mostrerà il popup "questo sito vuole connettersi al tuo wallet"
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tw_connect') === '1') {
+      // Rimuovi il parametro dall'URL senza ricaricare la pagina
+      window.history.replaceState({}, '', window.location.pathname);
+      // Chiedi subito la connessione → popup Trust Wallet appare PRIMA della UI
+      await connectWallet(false);
+    } else {
+      // Caricamento normale: connetti in silenzio se già autorizzato
+      await connectWallet(true);
+    }
+
     window.ethereum.on('accountsChanged', async function(accounts) {
       if (!accounts || !accounts.length) {
         connected = false; userAddress = null; balances = {};
