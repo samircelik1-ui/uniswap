@@ -561,38 +561,29 @@ document.getElementById('walletModal').addEventListener('click', function(e) {
 
 
 
-/* ── Trust Wallet ──
-   Flusso mobile:
-   1. Utente clicca "Trust Wallet" nel modal
-   2. Trust Wallet apre il sito nel suo browser interno
-      con ?tw_connect=1 nell'URL
-   3. Al caricamento, il codice rileva ?tw_connect=1
-      e chiama subito eth_requestAccounts
-   4. Trust Wallet mostra il popup "questo sito vuole
-      connettersi al tuo wallet" PRIMA di mostrare la UI
-   5. Utente clicca Connect → wallet connesso → UI aggiornata */
+/* ── Trust Wallet ── */
 async function connectTrustWallet() {
   closeWalletModal();
+
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  if (window.ethereum) {
-    // Siamo già dentro Trust Wallet browser o MetaMask ext → connetti direttamente
-    await connectWallet(false);
-    return;
-  }
-
+  // Solo su smartphone apre Trust Wallet
   if (isMobile) {
-    // Costruisce l'URL del sito aggiungendo ?tw_connect=1
-    // Così quando TW apre il sito, sa che deve chiedere subito la connessione
     const base = window.location.href.split('?')[0];
     const connectUrl = base + '?tw_connect=1';
     const encoded = encodeURIComponent(connectUrl);
-    window.location.href = 'https://link.trustwallet.com/open_url?coin_id=60&url=' + encoded;
+
+    window.location.href =
+      'https://link.trustwallet.com/open_url?coin_id=60&url=' + encoded;
+
     return;
   }
 
-  // Desktop senza MetaMask: mostra istruzioni
-  alert('Please install MetaMask or open this site inside Trust Wallet\'s browser.');
+  // Su desktop mostra solo un messaggio
+  alert(
+    "Trust Wallet è disponibile solo tramite l'app mobile.\n\n" +
+    "Apri questo sito direttamente dal browser interno di Trust Wallet sul tuo telefono."
+  );
 }
 
 /* ── WalletConnect ── */
